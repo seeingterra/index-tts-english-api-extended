@@ -390,62 +390,52 @@ def health_check():
 @app.get('/v1/voices')
 def list_voices(request: Request, full: bool = False):
     """
-    Auto-list voices from the repository `examples` folder.
-    Returns a list compatible with OpenAI-style voice metadata while preserving TTS-specific fields.
-    Each voice entry includes: id, name, language, sample_url, and optional metadata loaded from a .json next to the sample.
+    List voices. Default returns a Voxta-friendly bare array of objects like
+    {"label": "<name>", "parameters": {"voice": "<id>"}}
+    For backward compatibility, callers may request `?full=true` to receive
+    the richer OpenAI-style wrapper: {"voices": [...]} with extra metadata.
     """
-    voices = []
     examples_dir = EXAMPLES_DIR
     if not os.path.isdir(examples_dir):
-        return JSONResponse(status_code=200, content={"voices": []})
+        return {"voices": []} if full else []
 
-    # Consider files in examples with audio-like extensions as voice samples. If a same-named .json exists, load it.
     supported_audio_exts = {'.wav', '.mp3', '.m4a', '.ogg'}
+    simple_list = []
+    rich_list = []
     for fname in sorted(os.listdir(examples_dir)):
         fpath = os.path.join(examples_dir, fname)
         if os.path.isfile(fpath):
             name, ext = os.path.splitext(fname)
             if ext.lower() in supported_audio_exts:
-                voice_id = name
-                # Build absolute sample URL. Prefer PUBLIC_URL env var; otherwise derive from request.
+                # simple entry for Voxta
+                simple_list.append({"label": name, "parameters": {"voice": name}})
+
+                # build rich metadata when requested
                 public_url = os.getenv('PUBLIC_URL')
                 if public_url:
                     base = public_url.rstrip('/')
                 else:
-                    # request.base_url is like http://127.0.0.1:8010/
                     base = str(request.base_url).rstrip('/')
                 sample_url = f"{base}/examples/{fname}"
-                meta = {"id": voice_id, "name": name, "sample_url": sample_url}
-
-                # load optional metadata file examples/<name>.json
+                meta = {"id": name, "name": name, "language": "und", "sample_url": sample_url}
                 meta_path = os.path.join(examples_dir, f"{name}.json")
                 if os.path.exists(meta_path):
                     try:
                         import json
                         with open(meta_path, 'r', encoding='utf-8') as fh:
                             j = json.load(fh)
-                            # Merge known fields while keeping id/name/sample_url
                             meta.update({k: v for k, v in j.items() if k not in meta})
                     except Exception as e:
                         print(f"⚠️ Failed to load metadata for {name}: {e}")
-
-                # Provide an OpenAI-compatible shape under a top-level 'voices' key
-                # Keep TTS-specific extras under 'tts' key
-                voice_entry = {
-                    "id": voice_id,
-                    "name": meta.get('name', voice_id),
+                rich_list.append({
+                    "id": name,
+                    "name": meta.get('name', name),
                     "language": meta.get('language', 'und'),
                     "sample_url": sample_url,
                     "tts": {k: v for k, v in meta.items() if k not in {'id', 'name', 'language', 'sample_url'}}
-                }
-                voices.append(voice_entry)
+                })
 
-    # Voxta expects a bare JSON array. To remain compatible with other
-    # clients that expect the OpenAI-style wrapper, support ?full=true.
-    if full:
-        return {"voices": voices}
-    else:
-        return voices
+    return {"voices": rich_list} if full else simple_list
 
 
 @app.get('/v1/voxta/voices')

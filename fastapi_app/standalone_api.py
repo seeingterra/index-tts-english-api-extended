@@ -219,24 +219,25 @@ def health_check():
 
 @app.get('/v1/voices')
 def list_voices(request: Request, full: bool = False):
-    voices = []
     if not os.path.isdir(EXAMPLES_DIR):
         return {"voices": []} if full else []
     supported_audio_exts = {'.wav', '.mp3', '.m4a', '.ogg'}
+    simple_list = []
+    rich_list = []
     for fname in sorted(os.listdir(EXAMPLES_DIR)):
         fpath = os.path.join(EXAMPLES_DIR, fname)
         if os.path.isfile(fpath):
             name, ext = os.path.splitext(fname)
             if ext.lower() in supported_audio_exts:
+                simple_list.append({"label": name, "parameters": {"voice": name}})
                 public_url = os.getenv('PUBLIC_URL')
                 if public_url:
                     base = public_url.rstrip('/')
                 else:
                     base = str(request.base_url).rstrip('/')
                 sample_url = f"{base}/examples/{fname}"
-                voice_entry = {"id": name, "name": name, "language": "und", "sample_url": sample_url, "tts": {}}
-                voices.append(voice_entry)
-    return {"voices": voices} if full else voices
+                rich_list.append({"id": name, "name": name, "language": "und", "sample_url": sample_url, "tts": {}})
+    return {"voices": rich_list} if full else simple_list
 
 
 @app.get('/v1/voxta/voices')
