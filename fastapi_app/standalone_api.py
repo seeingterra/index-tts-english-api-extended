@@ -36,6 +36,8 @@ def load_model_prompt_map():
 
 class SpeechRequest(BaseModel):
     model: str
+    # Optional Voxta-style voice id (examples/<voice>.wav)
+    voice: str = ""
     input: str
     language: str = "en"
     emo_control_method: Literal[
@@ -119,11 +121,23 @@ async def create_speech(speech_request: SpeechRequest):
             in_memory_cache.move_to_end(cache_key)
             return Response(content=in_memory_cache[cache_key], media_type="audio/wav")
 
-        # resolve prompt audio
-        try:
-            full_prompt_path = resolve_prompt_path(speech_request.model)
-        except FileNotFoundError:
-            raise HTTPException(status_code=400, detail=f"Reference audio for model '{speech_request.model}' not found.")
+        # resolve speaker prompt audio (prefer Voxta `voice` -> examples/<voice>.wav)
+        full_prompt_path = None
+        if getattr(speech_request, 'voice', None):
+            candidate = os.path.join(EXAMPLES_DIR, f"{speech_request.voice}.wav")
+            if os.path.exists(candidate):
+                full_prompt_path = candidate
+
+        if not full_prompt_path:
+            # try examples/<model>.wav (backward compat), then model_wav/default_prompt.wav
+            ex_candidate = os.path.join(EXAMPLES_DIR, f"{speech_request.model}.wav")
+            if os.path.exists(ex_candidate):
+                full_prompt_path = ex_candidate
+            else:
+                try:
+                    full_prompt_path = resolve_prompt_path(speech_request.model)
+                except FileNotFoundError:
+                    raise HTTPException(status_code=400, detail=f"Reference audio for model '{speech_request.model}' not found.")
 
         # ensure tts instance
         tts = await get_tts_instance()
