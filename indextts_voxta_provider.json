@@ -1,0 +1,15 @@
+{
+  "label": "IndexTTS (local)",
+  "values": {
+    "ContentType": "audio/wav",
+    "ForceConversion": "false",
+    "UrlTemplate": "http://localhost:8010/v1/audio/speech",
+    "Request ContentType": "application/json",
+  "RequestBody": "{\n  \"model\": \"{{voice}}\",\n  \"input\": \"{{text}}\",\n  \"language\": \"{{language}}\",\n  \"emotion\": \"{{emotion}}\",\n  \"emo_control_method\": \"Same as the voice reference\",\n  \"format\": \"wav\"\n}",
+    "VoicesFormat": "{\n  \"label\": \"{{name}}\",\n  \"parameters\": {\n    \"voice\": \"{{id}}\"\n  }\n}",
+    "ThinkingSpeech": "..",
+    "AudioGap": "0",
+  "VoicesUrl": "http://localhost:8010/v1/voxta/voices",
+    "AuthorizationHeader": ""
+  }
+}

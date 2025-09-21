@@ -6,16 +6,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import JSONResponse
 from gradio_client import Client, handle_file
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from tenacity import retry, stop_after_attempt, wait_fixed
 from pydantic import BaseModel
 from typing import Literal
 import uvicorn
 import asyncio
-import httpx # 导入 httpx 用于发送 HTTP 请求
+import httpx # import httpx for sending HTTP requests
 from fastapi.middleware.cors import CORSMiddleware
 
-# 1. 导入新的 WebSocket 管理器
+# 1. Import the WebSocket manager
 from .websocket_manager import router as websocket_router, manager as websocket_manager
 
 load_dotenv()
@@ -31,7 +32,7 @@ async def lifespan(app: FastAPI):
     MODEL_PROMPT_MAP = load_model_prompt_map()
     print("✅ Model reference audios loaded.")
 
-    # 打印 API 和 WebSocket 地址
+    # Print API and WebSocket addresses
     host = os.getenv("UVICORN_HOST", "127.0.0.1")
     port = int(os.getenv("UVICORN_PORT", "8010"))
     print(f"\n🎉 Service initialized")
@@ -39,33 +40,62 @@ async def lifespan(app: FastAPI):
     print(f"🔌 WebSocket endpoint: ws://{host}:{port}/ws\n")
 
     # Try to connect to the Gradio API. Increase retries and use backoff to allow Gradio time to become ready.
-    max_attempts = 10
-    for attempt in range(max_attempts):
-        try:
-            gradio_client = Client(GRADIO_URL)
-            print(f"✅ Gradio client connected (attempt {attempt + 1}/{max_attempts})")
-            # On successful connect, launch the startup test task
-            asyncio.create_task(send_startup_request())
-            break
-        except Exception as e:
-            backoff = 2 * (attempt + 1)
-            print(f"❌ Gradio client connection failed (attempt {attempt + 1}/{max_attempts}): {e}. Retrying in {backoff}s...")
-            await asyncio.sleep(backoff)
-    if not gradio_client:
-        print("🚨 Warning: Gradio client initialization failed after retries; service may be degraded.")
+    # Ensure local connections bypass any environment HTTP proxy which can cause connection failures
+    os.environ.setdefault('NO_PROXY', '127.0.0.1,localhost')
+    os.environ.setdefault('no_proxy', '127.0.0.1,localhost')
+
+    print(f"🔧 DEBUG GRADIO_URL={GRADIO_URL} NO_PROXY={os.environ.get('NO_PROXY')} no_proxy={os.environ.get('no_proxy')}")
+
+    # Start a non-blocking background task that will try to connect to Gradio
+    # This lets the API start and serve read-only endpoints even when the Gradio UI
+    # is not running. Audio generation endpoints will return 503 until a connection
+    # is established.
+    async def _gradio_reconnect_loop():
+        global gradio_client
+        while True:
+            if gradio_client is None:
+                try:
+                    gradio_client = Client(GRADIO_URL)
+                    print(f"✅ Gradio client connected (background): {GRADIO_URL}")
+                    # Fire-and-forget a startup test request when we first connect
+                    try:
+                        asyncio.create_task(send_startup_request())
+                    except Exception:
+                        pass
+                except Exception as e:
+                    print(f"ℹ️ Gradio client not ready: {e}")
+            await asyncio.sleep(5)
+
+    reconnect_task = asyncio.create_task(_gradio_reconnect_loop())
     
-    # 启动后台监控任务
+    # Start background monitoring task
     monitor_task = asyncio.create_task(monitor_inactivity())
     
     yield
     
     # Shutdown
-    print("🔌 正在关闭服务...")
+    print("🔌 Shutting down service...")
     monitor_task.cancel()
+    try:
+        reconnect_task.cancel()
+    except Exception:
+        pass
     try:
         await monitor_task
     except asyncio.CancelledError:
-        print("✅ 后台监控任务已成功取消。")
+        print("✅ Background monitor task cancelled successfully.")
+
+    # Cleanup temporary files created by the service (safe, repo-local directory)
+    try:
+        CLEANUP_DIR = os.getenv('SERVICE_TMP_DIR', os.path.join(os.getcwd(), '.tmp'))
+        if os.path.isdir(CLEANUP_DIR):
+            import shutil
+            shutil.rmtree(CLEANUP_DIR)
+            print(f"🧹 Removed temporary directory: {CLEANUP_DIR}")
+        else:
+            print(f"ℹ️ No temporary directory to remove at: {CLEANUP_DIR}")
+    except Exception as e:
+        print(f"⚠️ Failed to cleanup temporary files: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -78,7 +108,7 @@ async def log_denied_websocket_connections(request: Request, call_next):
     if request.scope["type"] == "websocket":
         origin = request.headers.get("origin")
         if origin not in ALLOWED_ORIGINS:
-            print(f"[CORS] ❌ 拒绝了来自未经授权的源 <{origin}> 的 WebSocket 连接请求。", flush=True)
+            print(f"[CORS] ❌ Denied WebSocket connection attempt from unauthorized origin <{origin}>.", flush=True)
     
     response = await call_next(request)
     return response
@@ -96,11 +126,16 @@ app.add_middleware(
 # 2. 将 WebSocket 路由集成到主应用中
 app.include_router(websocket_router)
 
-GRADIO_URL = os.getenv("GRADIO_URL", "http://127.0.0.1:7860/")
+# Allow overriding Gradio port with GRADIO_PORT env var for environments where 7860 is blocked
+gradio_port = os.getenv('GRADIO_PORT')
+if gradio_port:
+    GRADIO_URL = f"http://127.0.0.1:{gradio_port}/"
+else:
+    GRADIO_URL = os.getenv("GRADIO_URL", "http://127.0.0.1:7860/")
 
 gradio_client = None
 
-# --- 内存缓存配置 ---
+# --- In-memory cache configuration ---
 MAX_CACHE_SIZE = int(os.getenv("MAX_CACHE_SIZE", "100")) # 最大缓存条目数
 # 使用 OrderedDict 实现 LRU 缓存
 # 键是请求的哈希，值是音频内容的bytes
@@ -109,8 +144,9 @@ in_memory_cache = OrderedDict()
 MODEL_PROMPT_MAP = {}
 def load_model_prompt_map():
     """
-    动态加载 model_wav 目录下的所有 .wav 和 .m4a 文件，并生成 MODEL_PROMPT_MAP。
-    键是文件名（不含扩展名），值是文件的相对路径。
+    Dynamically load all .wav and .m4a files under the model_wav directory and
+    generate MODEL_PROMPT_MAP. Keys are filenames (without extension), values
+    are the relative file paths.
     """
     model_wav_dir = "model_wav"
     supported_extensions = (".wav", ".m4a")  # 支持的文件扩展名
@@ -123,7 +159,7 @@ def load_model_prompt_map():
         if filename.lower().endswith(supported_extensions):
             model_name = os.path.splitext(filename)[0]
             prompt_map[model_name] = os.path.join(model_wav_dir, filename)
-            print(f"  - 发现模型: '{model_name}' -> '{prompt_map[model_name]}'")
+            print(f"  - Found model: '{model_name}' -> '{prompt_map[model_name]}'")
     
     if not prompt_map:
         print(f"⚠️ Warning: no supported audio files found in '{model_wav_dir}' ({', '.join(supported_extensions)}).")
@@ -132,11 +168,26 @@ def load_model_prompt_map():
 
 DEFAULT_PROMPT_AUDIO_PATH = "model_wav/default_prompt.wav"
 
+# Serve examples directory as static files so sample audio and metadata are reachable via HTTP
+EXAMPLES_DIR = os.path.join(os.getcwd(), "examples")
+if os.path.isdir(EXAMPLES_DIR):
+    try:
+        app.mount("/examples", StaticFiles(directory=EXAMPLES_DIR), name="examples")
+        print(f"✅ Mounted examples folder at /examples (serving from {EXAMPLES_DIR})")
+    except Exception as e:
+        print(f"⚠️ Failed to mount examples directory: {e}")
+else:
+    print(f"ℹ️ Examples directory not found at {EXAMPLES_DIR}; /examples endpoint will be unavailable.")
+
 class SpeechRequest(BaseModel):
     model: str
     input: str
+    # ISO language code, e.g. 'en', 'zh', 'ja'. Default to 'en'.
+    language: str = "en"
     emo_control_method: Literal['Same as the voice reference', 'Use emotion reference audio', 'Use emotion vector', 'Use text description to control emotion'] = "Same as the voice reference"
     emo_weight: float = 0.8
+    # Optional named emotion label (e.g. 'happy', 'sad') that Voxta can send.
+    emotion: str = ""
     vec1: float = 0
     vec2: float = 0
     vec3: float = 0
@@ -165,8 +216,30 @@ def call_gradio_with_retry(client, *args, **kwargs):
 @app.post('/v1/audio/speech')
 async def create_speech(speech_request: SpeechRequest):
     try:
+        # If Gradio UI isn't connected, attempt to serve a local fallback sample
         if not gradio_client:
-            raise HTTPException(status_code=503, detail="Gradio 后端服务未连接或初始化失败")
+            # Look for examples/<model>.wav first, then model_wav/default_prompt.wav
+            fallback_paths = []
+            ex_path = os.path.join(os.getcwd(), 'examples', f"{speech_request.model}.wav")
+            if os.path.exists(ex_path):
+                fallback_paths.append(ex_path)
+            default_path = os.path.join(os.getcwd(), DEFAULT_PROMPT_AUDIO_PATH)
+            if os.path.exists(default_path):
+                fallback_paths.append(default_path)
+
+            if fallback_paths:
+                # Return the first available fallback audio file
+                fp = fallback_paths[0]
+                try:
+                    with open(fp, 'rb') as fh:
+                        data = fh.read()
+                    print(f"⚠️ Gradio not connected — returning local fallback audio for model '{speech_request.model}' from {fp}")
+                    return Response(content=data, media_type='audio/wav')
+                except Exception as e:
+                    print(f"⚠️ Failed to read fallback audio {fp}: {e}")
+            # No fallback available; return a clear 503 with guidance
+            raise HTTPException(status_code=503, detail=("Gradio backend is not connected and no local fallback audio found. "
+                                                         "Start the web UI or provide a sample at examples/<model>.wav or model_wav/default_prompt.wav."))
         
         # --- 内存缓存逻辑 ---
         # 生成缓存键：使用模型名和输入文本的哈希值
@@ -181,32 +254,63 @@ async def create_speech(speech_request: SpeechRequest):
             return Response(content=in_memory_cache[cache_key], media_type="audio/wav")
         # --- 缓存逻辑结束 ---
         
-        # 缓存未命中，继续生成新音频
+        # Cache miss: proceed to generate a new audio file
         prompt_file_path = MODEL_PROMPT_MAP.get(speech_request.model)
         if not prompt_file_path:
             prompt_file_path = DEFAULT_PROMPT_AUDIO_PATH
-            # 注意：这里需要检查文件是否存在，如果不存在，即使是默认路径也应报错
+            # Ensure default prompt actually exists; if not, return a clear error
             if not os.path.exists(os.path.join(os.getcwd(), prompt_file_path)):
-                raise HTTPException(status_code=400, detail=f"不支持的模型 '{speech_request.model}' 且默认参考语音文件 '{DEFAULT_PROMPT_AUDIO_PATH}' 未找到。请确保 'model_wav' 目录存在且包含该文件。" )
-        
+                raise HTTPException(status_code=400, detail=f"Unsupported model '{speech_request.model}' and default reference audio '{DEFAULT_PROMPT_AUDIO_PATH}' not found. Ensure the 'model_wav' directory exists and contains the file.")
+
         full_prompt_path = os.path.join(os.getcwd(), prompt_file_path)
         if not os.path.exists(full_prompt_path):
-            # 这个检查在上面已经做了一部分，这里可以更具体地提示
-            raise HTTPException(status_code=500, detail=f"模型 '{speech_request.model}' 的参考语音文件 '{full_prompt_path}' 未找到。" )
-        
-        file_data = handle_file(full_prompt_path)
-        
-        print(f"📝 收到请求：要转换为语音的文本是: '{speech_request.input}'，模型是: '{speech_request.model}'")
-        print(f"🔄 内存缓存未命中，开始生成新音频...")
+            # More explicit message if the resolved full path is missing
+            raise HTTPException(status_code=500, detail=f"Reference audio for model '{speech_request.model}' not found at '{full_prompt_path}'.")
 
-        # 使用与 api.md 兼容的参数调用 Gradio
+        file_data = handle_file(full_prompt_path)
+
+        print(f"📝 Received request: text='{speech_request.input}', model='{speech_request.model}'")
+        print(f"🔄 Cache miss: generating new audio...")
+
+        # Map API emo_control_method to the Gradio UI choice strings expected by the `/gen_single` endpoint
+        gradio_emo_choices = [
+            "Same as speaker voice",
+            "Use emotion reference audio",
+            "Use emotion vector control",
+            "Use emotion text description",
+        ]
+
+        # Normalize emo_control_method value (API may send a descriptive string or an index)
+        emo_choice_value = speech_request.emo_control_method
+        try:
+            if isinstance(emo_choice_value, int):
+                emo_choice_value = gradio_emo_choices[emo_choice_value]
+
+            variant_map = {
+                'Same as the voice reference': 'Same as speaker voice',
+                'Use emotion reference audio': 'Use emotion reference audio',
+                'Use emotion vector': 'Use emotion vector control',
+                'Use emotion vector control': 'Use emotion vector control',
+                'Use text description to control emotion': 'Use emotion text description',
+            }
+            if isinstance(emo_choice_value, str) and emo_choice_value in variant_map:
+                emo_choice_value = variant_map[emo_choice_value]
+        except Exception:
+            # leave as-is if mapping fails
+            pass
+
+        # Prefer explicit emotion text supplied by the API client (or Voxta) over emo_text
+        emo_text_value = speech_request.emo_text if speech_request.emo_text else (speech_request.emotion or "")
+
         result = call_gradio_with_retry(
             gradio_client,
-            emo_control_method=speech_request.emo_control_method,
+            emo_control_method=emo_choice_value,
             prompt=file_data,
             text=speech_request.input,
-            emo_ref_path=handle_file(full_prompt_path),  # 假设当方法为“与参考相同”时，可重用参考音频
+            emo_ref_path=handle_file(full_prompt_path),  # reuse reference audio when appropriate
             emo_weight=speech_request.emo_weight,
+            # Forward requested language to the model/UI when provided
+            language=speech_request.language,
             vec1=speech_request.vec1,
             vec2=speech_request.vec2,
             vec3=speech_request.vec3,
@@ -215,9 +319,10 @@ async def create_speech(speech_request: SpeechRequest):
             vec6=speech_request.vec6,
             vec7=speech_request.vec7,
             vec8=speech_request.vec8,
-            emo_text=speech_request.emo_text,
+            emo_text=emo_text_value,
             emo_random=speech_request.emo_random,
-            max_text_tokens_per_sentence=speech_request.max_text_tokens_per_sentence,
+            # Map API field name to the Gradio endpoint's expected parameter name
+            max_text_tokens_per_segment=speech_request.max_text_tokens_per_sentence,
             param_16=speech_request.do_sample,
             param_17=speech_request.top_p,
             param_18=speech_request.top_k,
@@ -228,7 +333,7 @@ async def create_speech(speech_request: SpeechRequest):
             param_23=speech_request.max_mel_tokens,
             api_name="/gen_single"
         )
-        
+
         result_path = None
         if isinstance(result, dict):
             if 'value' in result:
@@ -237,37 +342,36 @@ async def create_speech(speech_request: SpeechRequest):
                 result_path = result['path']
         elif isinstance(result, str):
             result_path = result
-            
+
         if result_path and os.path.exists(result_path):
             with open(result_path, "rb") as audio_file:
                 audio_content = audio_file.read()
-            
-            # --- 内存缓存逻辑：保存新生成的音频 ---
+
+            # Save generated audio to in-memory LRU cache
             if len(in_memory_cache) >= MAX_CACHE_SIZE:
-                # 缓存达到上限，移除最旧的（LRU）
-                oldest_key, _ = in_memory_cache.popitem(last=False) # last=False 移除最旧的
-                print(f"🧹 内存缓存达到上限，移除最旧条目: {oldest_key}")
-            
+                oldest_key, _ = in_memory_cache.popitem(last=False)
+                print(f"🧹 Cache full, removed oldest entry: {oldest_key}")
+
             in_memory_cache[cache_key] = audio_content
-            print(f"💾 音频已加入内存缓存: {cache_key}, 当前缓存条目数: {len(in_memory_cache)}")
-            # --- 缓存逻辑结束 ---
+            print(f"💾 Audio cached: {cache_key}, entries: {len(in_memory_cache)}")
 
             try:
                 os.remove(result_path)
-                print(f"🗑️ 成功删除临时音频文件: {result_path}")
+                print(f"🗑️ Deleted temporary audio file: {result_path}")
             except Exception as e:
-                print(f"⚠️ 删除临时音频文件失败 {result_path}: {e}")
-                pass # 不影响主流程
-                
+                print(f"⚠️ Failed to delete temporary file {result_path}: {e}")
+
             return Response(content=audio_content, media_type="audio/wav")
         else:
-            print(f"🚨 错误：Gradio 返回结果路径无效或文件不存在。Result: {result}")
-            raise HTTPException(status_code=500, detail="Gradio 返回结果路径无效或文件不存在。" )
+            print(f"🚨 Error: Gradio returned an invalid or missing result path. Result: {result}")
+            raise HTTPException(status_code=500, detail="Gradio returned an invalid or missing result path.")
     except HTTPException:
-        raise # 重新抛出已处理的HTTPException
+        raise  # re-raise handled HTTPException
     except Exception as e:
-        print(f"💥 处理请求时发生未知错误: {e}")
-        raise HTTPException(status_code=500, detail=f"处理请求失败: {str(e)}")
+        import traceback
+        tb = traceback.format_exc()
+        print(f"💥 Unexpected error while processing request: {e}\nTraceback:\n{tb}")
+        raise HTTPException(status_code=500, detail=f"Request processing failed: {str(e)}")
 
 @app.get('/health')
 def health_check():
@@ -278,9 +382,122 @@ def health_check():
     }
     
     if gradio_client:
-        return {"status": "ok", "gradio_connected": True, "cache_info": cache_info, "message": "服务运行正常，Gradio 客户端已连接。"}
+        return {"status": "ok", "gradio_connected": True, "cache_info": cache_info, "message": "Service healthy; Gradio client is connected."}
     else:
-        return {"status": "degraded", "gradio_connected": False, "cache_info": cache_info, "message": "Gradio 客户端未连接，部分功能可能受限。"}
+        return {"status": "degraded", "gradio_connected": False, "cache_info": cache_info, "message": "Gradio client not connected; some features may be limited."}
+
+
+@app.get('/v1/voices')
+def list_voices(request: Request, full: bool = False):
+    """
+    Auto-list voices from the repository `examples` folder.
+    Returns a list compatible with OpenAI-style voice metadata while preserving TTS-specific fields.
+    Each voice entry includes: id, name, language, sample_url, and optional metadata loaded from a .json next to the sample.
+    """
+    voices = []
+    examples_dir = EXAMPLES_DIR
+    if not os.path.isdir(examples_dir):
+        return JSONResponse(status_code=200, content={"voices": []})
+
+    # Consider files in examples with audio-like extensions as voice samples. If a same-named .json exists, load it.
+    supported_audio_exts = {'.wav', '.mp3', '.m4a', '.ogg'}
+    for fname in sorted(os.listdir(examples_dir)):
+        fpath = os.path.join(examples_dir, fname)
+        if os.path.isfile(fpath):
+            name, ext = os.path.splitext(fname)
+            if ext.lower() in supported_audio_exts:
+                voice_id = name
+                # Build absolute sample URL. Prefer PUBLIC_URL env var; otherwise derive from request.
+                public_url = os.getenv('PUBLIC_URL')
+                if public_url:
+                    base = public_url.rstrip('/')
+                else:
+                    # request.base_url is like http://127.0.0.1:8010/
+                    base = str(request.base_url).rstrip('/')
+                sample_url = f"{base}/examples/{fname}"
+                meta = {"id": voice_id, "name": name, "sample_url": sample_url}
+
+                # load optional metadata file examples/<name>.json
+                meta_path = os.path.join(examples_dir, f"{name}.json")
+                if os.path.exists(meta_path):
+                    try:
+                        import json
+                        with open(meta_path, 'r', encoding='utf-8') as fh:
+                            j = json.load(fh)
+                            # Merge known fields while keeping id/name/sample_url
+                            meta.update({k: v for k, v in j.items() if k not in meta})
+                    except Exception as e:
+                        print(f"⚠️ Failed to load metadata for {name}: {e}")
+
+                # Provide an OpenAI-compatible shape under a top-level 'voices' key
+                # Keep TTS-specific extras under 'tts' key
+                voice_entry = {
+                    "id": voice_id,
+                    "name": meta.get('name', voice_id),
+                    "language": meta.get('language', 'und'),
+                    "sample_url": sample_url,
+                    "tts": {k: v for k, v in meta.items() if k not in {'id', 'name', 'language', 'sample_url'}}
+                }
+                voices.append(voice_entry)
+
+    # Voxta expects a bare JSON array. To remain compatible with other
+    # clients that expect the OpenAI-style wrapper, support ?full=true.
+    if full:
+        return {"voices": voices}
+    else:
+        return voices
+
+
+@app.get('/v1/voxta/voices')
+def list_voxta_voices(request: Request):
+    """Return voices formatted to match the simple Voxta `VoicesFormat` example.
+    Each entry will be an object like: {"label": "<name>", "parameters": {"voice": "<id>"}}
+    """
+    res = []
+    examples_dir = EXAMPLES_DIR
+    if not os.path.isdir(examples_dir):
+        return JSONResponse(status_code=200, content={"voices": []})
+
+    supported_audio_exts = {'.wav', '.mp3', '.m4a', '.ogg'}
+    for fname in sorted(os.listdir(examples_dir)):
+        fpath = os.path.join(examples_dir, fname)
+        if os.path.isfile(fpath):
+            name, ext = os.path.splitext(fname)
+            if ext.lower() in supported_audio_exts:
+                entry = {
+                    "label": name,
+                    "parameters": {"voice": name}
+                }
+                res.append(entry)
+
+    # Voxta expects a bare JSON array; return the list directly to avoid parsing errors
+    return res
+
+
+@app.get('/get_predefined_voices')
+def get_predefined_voices(request: Request):
+    """Compatibility endpoint for Voxta legacy expectations.
+    Returns a bare array of {label, parameters:{voice}} entries (no wrapper object).
+    Accepts optional `Authorization` header and ignores it for now.
+    """
+    res = []
+    examples_dir = EXAMPLES_DIR
+    if not os.path.isdir(examples_dir):
+        return []
+
+    supported_audio_exts = {'.wav', '.mp3', '.m4a', '.ogg'}
+    for fname in sorted(os.listdir(examples_dir)):
+        fpath = os.path.join(examples_dir, fname)
+        if os.path.isfile(fpath):
+            name, ext = os.path.splitext(fname)
+            if ext.lower() in supported_audio_exts:
+                entry = {
+                    "label": name,
+                    "parameters": {"voice": name}
+                }
+                res.append(entry)
+
+    return res
 
 # --- 新增：服务活动监控 ---
 INACTIVITY_TIMEOUT = 1800  # 30分钟的秒数

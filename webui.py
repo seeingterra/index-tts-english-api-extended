@@ -23,7 +23,8 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 parser.add_argument("--verbose", action="store_true", default=False, help="Enable verbose mode")
-parser.add_argument("--port", type=int, default=7860, help="Port to run the web UI on")
+default_port = int(os.getenv('GRADIO_PORT', '7860'))
+parser.add_argument("--port", type=int, default=default_port, help="Port to run the web UI on")
 parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to run the web UI on")
 parser.add_argument("--model_dir", type=str, default="./checkpoints", help="Model checkpoints directory")
 parser.add_argument("--fp16", action="store_true", default=False, help="Use FP16 for inference if available")
@@ -114,7 +115,10 @@ def normalize_emo_vec(emo_vec):
 def gen_single(emo_control_method,prompt, text,
                emo_ref_path, emo_weight,
                vec1, vec2, vec3, vec4, vec5, vec6, vec7, vec8,
-               emo_text,emo_random,
+               emo_text, emo_random,
+               # optional fields accepted from API clients (Voxta)
+               language: str = "en",
+               emotion: str = "",
                max_text_tokens_per_segment=120,
                 *args, progress=gr.Progress()):
     output_path = None
@@ -151,9 +155,9 @@ def gen_single(emo_control_method,prompt, text,
         # don't use the emotion vector inputs for the other modes
         vec = None
 
+    # Prefer explicit emo_text provided by caller; fall back to 'emotion' named label if present
     if emo_text == "":
-        # erase empty emotion descriptions; `infer()` will then automatically use the main prompt
-        emo_text = None
+        emo_text = emotion if emotion != "" else None
 
     print(f"Emo control mode:{emo_control_method},weight:{emo_weight},vec:{vec}")
     output = tts.infer(spk_audio_prompt=prompt, text=text,
@@ -161,6 +165,7 @@ def gen_single(emo_control_method,prompt, text,
                        emo_audio_prompt=emo_ref_path, emo_alpha=emo_weight,
                        emo_vector=vec,
                        use_emo_text=(emo_control_method==3), emo_text=emo_text,use_random=emo_random,
+                       language=language,
                        verbose=cmd_args.verbose,
                        max_text_tokens_per_segment=int(max_text_tokens_per_segment),
                        **kwargs)
