@@ -248,6 +248,8 @@ async def get_tts_instance():
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA not available. This standalone API requires a CUDA-enabled PyTorch. Install CUDA-enabled torch and restart the service.")
 
+        print('>> Selecting GPU device (unified selector)...')
+        # Force interactive menu if available for API startup by setting INDEXTTS_INTERACTIVE_SELECT=1 (default already enabled)
         device, auto_fp16 = select_device(require_cuda=True)
 
         # Optionally enable fp16 via explicit env var or due to automatic selection
@@ -256,15 +258,14 @@ async def get_tts_instance():
         if use_fp16:
             print('>> INDEXTTS_USE_FP16 enabled: IndexTTS2 will attempt to use fp16 where supported')
 
-        # Memory fraction already applied by select_device if env var set.
-
-    print(f">> Initializing IndexTTS2 (device={device or 'cpu'}) ...")
-    # Match example usage: explicitly disable fp16/deepspeed unless desired
-    tts = IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=use_fp16, use_cuda_kernel=False, use_deepspeed=False, device=device)
-    print(">> IndexTTS2 initialized")
-    tts_instance_local = tts
-    tts_instance = tts_instance_local
-    return tts_instance
+        if not device:
+            raise RuntimeError("Device selection failed (no CUDA device resolved). Set INDEXTTS_FORCE_DEVICE.")
+        print(f">> Initializing IndexTTS2 (device={device}) ...")
+        tts = IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=use_fp16, use_cuda_kernel=False, use_deepspeed=False, device=device)
+        print(">> IndexTTS2 initialized")
+        tts_instance_local = tts
+        tts_instance = tts_instance_local
+        return tts_instance
 
 
 def resolve_prompt_path(model_name: str):

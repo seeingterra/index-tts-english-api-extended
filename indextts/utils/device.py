@@ -143,6 +143,11 @@ def select_device(require_cuda: bool = True) -> Tuple[str, bool]:
     selected_info = None  # (idx, free, total)
     if device is None:
         if gpu_infos:
+            # Always print summary of detected GPUs
+            if os.getenv('INDEXTTS_DEVICE_LOG', '1').strip().lower() not in ('0','false','no'):
+                print(">> Detected CUDA devices (idx: free/total MB): " + ", ".join(
+                    f"{i}:{free}/{tot}" for i, free, tot in sorted(gpu_infos, key=lambda x: x[0])
+                ))
             # Try full precision first
             for idx, free, total in sorted(gpu_infos, key=lambda x: -x[1]):
                 if free >= required_vram:
@@ -164,18 +169,24 @@ def select_device(require_cuda: bool = True) -> Tuple[str, bool]:
 
             # Offer interactive override if allowed & multi-device present
             interactive_flag = os.getenv('INDEXTTS_INTERACTIVE_SELECT', '1').strip().lower() not in ('0','false','no')
-            if interactive_flag and sys.stdin and sys.stdin.isatty() and len(gpu_infos) > 0:
-                menu_infos = sorted(gpu_infos, key=lambda x: -x[1])  # sorted by free desc
-                choice = _interactive_menu(menu_infos)
-                if choice is not None:
-                    if choice == -1:
-                        # 'All CUDA devices' – currently we do not implement multi-GPU inference; log and keep best
-                        print(">> 'All CUDA devices' selected. Multi-GPU inference not yet implemented; using best-fit device.")
-                    else:
-                        if 0 <= choice < len(menu_infos):
-                            sel = menu_infos[choice]
-                            device = f"cuda:{sel[0]}"; selected_info = sel
-                            print(f">> Overridden selection -> {device} (free {sel[1]}MB / total {sel[2]}MB)")
+            if len(gpu_infos) > 1 and interactive_flag:
+                if sys.stdin and sys.stdin.isatty():
+                    menu_infos = sorted(gpu_infos, key=lambda x: -x[1])  # sorted by free desc
+                    choice = _interactive_menu(menu_infos)
+                    if choice is not None:
+                        if choice == -1:
+                            print(">> 'All CUDA devices' selected. Multi-GPU inference not implemented; keeping previous selection.")
+                        else:
+                            if 0 <= choice < len(menu_infos):
+                                sel = menu_infos[choice]
+                                device = f"cuda:{sel[0]}"; selected_info = sel
+                                print(f">> Overridden selection -> {device} (free {sel[1]}MB / total {sel[2]}MB)")
+                else:
+                    # Non-interactive: show a pseudo-menu for clarity
+                    print(">> Non-interactive environment; to select a GPU set INDEXTTS_FORCE_DEVICE or INDEXTTS_CUDA_DEVICE.")
+                    for rank, (i, free, total) in enumerate(sorted(gpu_infos, key=lambda x: -x[1]), start=1):
+                        print(f"   [{rank}] GPU #{i} {torch.cuda.get_device_name(i)} free={free}MB total={total}MB")
+                    print(">> Using best-fit device above.")
         else:
             # Interactive multi-device fallback
             if dev_count <= 1:
