@@ -11,6 +11,21 @@ All notable changes to this repository should be documented in this file.
   - Broadened CUDA->torch wheel tag mapping for common CUDA versions (12.1, 12.0, 11.8, 11.7, 11.6) and nearest-compatible selection.
 - ci: added `.github/workflows/ci-windows-setup-cpu.yml` to validate the CPU installation path on `windows-latest`.
 
+## [2.0.1] - 2025-10-03
+### Added
+- Centralized CUDA OOM fallback utility `indextts/utils/oom_fallback.py` with environment-driven retry policy.
+- Automatic retry logic for both FastAPI entry points (`standalone_api.py`, `main.py`):
+  - Alt-GPU migration with fp16 + token budget reduction.
+  - Same-device fp16 upgrade + aggressive token reduction.
+- `/v1/health` endpoint exposing last OOM fallback event metadata.
+### Changed
+- Removed duplicated inline OOM handling blocks; replaced with reusable helper to reduce maintenance overhead.
+### Environment Variables
+- `INDEXTTS_OOM_RETRY`, `INDEXTTS_OOM_ALT_GPU`, `INDEXTTS_OOM_MIN_FREE_MB`, `INDEXTTS_OOM_REDUCE_FACTOR_ALT`, `INDEXTTS_OOM_REDUCE_FACTOR_SAME`, `INDEXTTS_OOM_VERBOSE` documented and honored.
+### Fixed
+- Eliminated unhandled OOM crash paths; requests now return structured errors when all fallback strategies fail.
+
+
 ## [2.0.0-voxta-integration] - 2025-10-03
 ### Added
 - Standalone FastAPI enhancements (`fastapi_app/standalone_api.py`): deterministic seed handling, in‑memory LRU caching, advanced voice discovery heuristics, `spk_audio` (path, URL, data URI) ingestion, GPU VRAM‑based device selection with optional fp16 fallback.
