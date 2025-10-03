@@ -713,6 +713,9 @@ async def create_speech(request: Request, speech_request: SpeechRequest):
             import torch as _torch
             err_msg = str(rt_err)
             if 'CUDA out of memory' in err_msg:
+                import os as _os
+                if _os.getenv('INDEXTTS_OOM_RETRY', '1') != '1':
+                    raise HTTPException(status_code=500, detail='CUDA OOM (retry disabled)')
                 print('>> OOM detected during inference. Attempting automatic failover...')
                 try:
                     # Identify current device index
@@ -742,21 +745,21 @@ async def create_speech(request: Request, speech_request: SpeechRequest):
                                 free_list.append((idx, free, total))
                     except Exception:
                         pass
+                    min_free_req = int(_os.getenv('INDEXTTS_OOM_MIN_FREE_MB', '512'))
                     if free_list:
                         free_list.sort(key=lambda x: -x[1])
                         cand_idx, cand_free, cand_total = free_list[0]
-                        # Require at least some headroom ( > 512MB free )
-                        if cand_free > 512:
+                        # Require at least configured headroom
+                        if cand_free > min_free_req and _os.getenv('INDEXTTS_OOM_ALT_GPU', '1') == '1':
                             alt_device = f'cuda:{cand_idx}'
                             print(f">> Failover candidate: {alt_device} free={cand_free}MB total={cand_total}MB")
                     if alt_device is None:
                         print('>> No alternative GPU with sufficient free memory found; trying in-place fp16 + reduced tokens.')
                         # Try in-place strategy: enable fp16 and shrink max_mel_tokens
                         try:
-                            if not gen_kwargs.get('do_sample'):
-                                pass
-                            # Reduce mel tokens by 40%
-                            gen_kwargs['max_mel_tokens'] = max(256, int(gen_kwargs['max_mel_tokens'] * 0.6))
+                            reduce_same = float(_os.getenv('INDEXTTS_OOM_REDUCE_FACTOR_SAME', '0.6'))
+                            reduce_same = 0.6 if reduce_same <= 0 or reduce_same >= 1 else reduce_same
+                            gen_kwargs['max_mel_tokens'] = max(256, int(gen_kwargs['max_mel_tokens'] * reduce_same))
                             print(f">> Retrying on same device with fp16={True} max_mel_tokens={gen_kwargs['max_mel_tokens']}")
                             # Re-init model in fp16 on same device if not already
                             if hasattr(tts, 'use_fp16') and not tts.use_fp16:
@@ -783,8 +786,10 @@ async def create_speech(request: Request, speech_request: SpeechRequest):
                         # Recreate model on alt_device with fp16 enforced and reduced tokens
                         try:
                             from indextts.infer_v2 import IndexTTS2 as _IndexTTS2
-                            reduced_tokens = max(256, int(gen_kwargs['max_mel_tokens'] * 0.7))
-                            print(f">> Reinitializing model on {alt_device} with fp16=1 max_mel_tokens={reduced_tokens}")
+                            reduce_alt = float(_os.getenv('INDEXTTS_OOM_REDUCE_FACTOR_ALT', '0.7'))
+                            reduce_alt = 0.7 if reduce_alt <= 0 or reduce_alt >= 1 else reduce_alt
+                            reduced_tokens = max(256, int(gen_kwargs['max_mel_tokens'] * reduce_alt))
+                            print(f">> Reinitializing model on {alt_device} with fp16=1 max_mel_tokens={reduced_tokens} (reduce factor {reduce_alt})")
                             new_tts = _IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=True, use_cuda_kernel=False, use_deepspeed=False, device=alt_device)
                             globals()['tts_instance'] = new_tts
                             tts = new_tts
