@@ -451,6 +451,12 @@ async def create_speech(speech_request: SpeechRequest):
             tmpfd, tmp_path = tempfile.mkstemp(suffix=".wav", prefix="indextts_")
             os.close(tmpfd)
             try:
+                from indextts.utils.oom_fallback import run_tts_with_oom_retry, get_last_oom_event
+                def _reinit(device: str, fp16: bool):
+                    from indextts.infer_v2 import IndexTTS2 as _IndexTTS2
+                    new_t = _IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=fp16, use_cuda_kernel=False, use_deepspeed=False, device=device)
+                    globals()['tts_instance'] = new_t
+                    return new_t
                 gen_kwargs = dict(
                     max_text_tokens_per_segment=speech_request.max_text_tokens_per_sentence,
                     do_sample=bool(speech_request.do_sample),
@@ -462,123 +468,32 @@ async def create_speech(speech_request: SpeechRequest):
                     repetition_penalty=float(speech_request.repetition_penalty),
                     max_mel_tokens=int(speech_request.max_mel_tokens)
                 )
-                tts.infer(spk_audio_prompt=spk_prompt,
-                          text=speech_request.input,
-                          output_path=tmp_path,
-                          emo_audio_prompt=emo_audio_prompt,
-                          emo_alpha=speech_request.emo_weight,
-                          emo_vector=emo_vector,
-                          use_emo_text=use_emo_text,
-                          emo_text=emo_text_value,
-                          use_random=speech_request.emo_random,
-                          verbose=False,
-                          **gen_kwargs)
-            except RuntimeError as rt_err:
-                import torch as _torch
-                if 'CUDA out of memory' in str(rt_err):
-                    import os as _os
-                    if _os.getenv('INDEXTTS_OOM_RETRY', '1') != '1':
-                        if os.path.exists(tmp_path):
-                            try: os.remove(tmp_path)
-                            except Exception: pass
-                        raise HTTPException(status_code=500, detail='CUDA OOM (retry disabled)')
-                    print('>> OOM detected in main API path. Attempting fallback...')
-                    current_dev = None
-                    try:
-                        current_dev = tts.device if hasattr(tts, 'device') else None
-                    except Exception:
-                        pass
-                    current_idx = None
-                    if current_dev and isinstance(current_dev, str) and current_dev.startswith('cuda:'):
-                        try:
-                            current_idx = int(current_dev.split(':')[1])
-                        except Exception:
-                            current_idx = None
-                    alt_device = None
-                    free_list = []
-                    try:
-                        import subprocess as _sub
-                        out = _sub.check_output(['nvidia-smi','--query-gpu=index,memory.total,memory.used','--format=csv,noheader,nounits'], universal_newlines=True, stderr=_sub.DEVNULL)
-                        for line in out.strip().splitlines():
-                            parts = [p.strip() for p in line.split(',')]
-                            if len(parts) >= 3:
-                                idx = int(parts[0]); total = int(parts[1]); used = int(parts[2]); free = total - used
-                                if current_idx is not None and idx == current_idx:
-                                    continue
-                                free_list.append((idx, free, total))
-                    except Exception:
-                        pass
-                    min_free_req = int(_os.getenv('INDEXTTS_OOM_MIN_FREE_MB', '512'))
-                    if free_list:
-                        free_list.sort(key=lambda x: -x[1])
-                        cand_idx, cand_free, cand_total = free_list[0]
-                        if cand_free > min_free_req and _os.getenv('INDEXTTS_OOM_ALT_GPU', '1') == '1':
-                            alt_device = f'cuda:{cand_idx}'
-                            print(f">> Fallback candidate: {alt_device} free={cand_free}MB total={cand_total}MB")
-                    try:
-                        if alt_device is None:
-                            # In-place retry with token reduction & fp16
-                            reduce_same = float(_os.getenv('INDEXTTS_OOM_REDUCE_FACTOR_SAME', '0.6'))
-                            reduce_same = 0.6 if reduce_same <= 0 or reduce_same >= 1 else reduce_same
-                            gen_kwargs['max_mel_tokens'] = max(256, int(gen_kwargs['max_mel_tokens'] * reduce_same))
-                            print(f">> Retrying on same device {current_dev} with fp16 and max_mel_tokens={gen_kwargs['max_mel_tokens']} (reduce factor {reduce_same})")
-                            from indextts.infer_v2 import IndexTTS2 as _IndexTTS2
-                            if hasattr(tts, 'use_fp16') and not tts.use_fp16:
-                                new_tts = _IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=True, use_cuda_kernel=False, use_deepspeed=False, device=current_dev)
-                                globals()['tts_instance'] = new_tts
-                                tts = new_tts
-                            tts.infer(spk_audio_prompt=spk_prompt,
-                                      text=speech_request.input,
-                                      output_path=tmp_path,
-                                      emo_audio_prompt=emo_audio_prompt,
-                                      emo_alpha=speech_request.emo_weight,
-                                      emo_vector=emo_vector,
-                                      use_emo_text=use_emo_text,
-                                      emo_text=emo_text_value,
-                                      use_random=speech_request.emo_random,
-                                      verbose=False,
-                                      **gen_kwargs)
-                        else:
-                            from indextts.infer_v2 import IndexTTS2 as _IndexTTS2
-                            reduce_alt = float(_os.getenv('INDEXTTS_OOM_REDUCE_FACTOR_ALT', '0.7'))
-                            reduce_alt = 0.7 if reduce_alt <= 0 or reduce_alt >= 1 else reduce_alt
-                            reduced_tokens = max(256, int(gen_kwargs['max_mel_tokens'] * reduce_alt))
-                            gen_kwargs['max_mel_tokens'] = reduced_tokens
-                            print(f">> Reinitializing model on {alt_device} fp16 with max_mel_tokens={reduced_tokens} (reduce factor {reduce_alt})")
-                            new_tts = _IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=True, use_cuda_kernel=False, use_deepspeed=False, device=alt_device)
-                            globals()['tts_instance'] = new_tts
-                            tts = new_tts
-                            tts.infer(spk_audio_prompt=spk_prompt,
-                                      text=speech_request.input,
-                                      output_path=tmp_path,
-                                      emo_audio_prompt=emo_audio_prompt,
-                                      emo_alpha=speech_request.emo_weight,
-                                      emo_vector=emo_vector,
-                                      use_emo_text=use_emo_text,
-                                      emo_text=emo_text_value,
-                                      use_random=speech_request.emo_random,
-                                      verbose=False,
-                                      **gen_kwargs)
-                    except Exception as fallback_e:
-                        if os.path.exists(tmp_path):
-                            try:
-                                os.remove(tmp_path)
-                            except Exception:
-                                pass
-                        raise HTTPException(status_code=500, detail=f"CUDA OOM fallback failed: {fallback_e}")
-                else:
+                infer_kwargs = dict(
+                    spk_audio_prompt=spk_prompt,
+                    text=speech_request.input,
+                    output_path=tmp_path,
+                    emo_audio_prompt=emo_audio_prompt,
+                    emo_alpha=speech_request.emo_weight,
+                    emo_vector=emo_vector,
+                    use_emo_text=use_emo_text,
+                    emo_text=emo_text_value,
+                    use_random=speech_request.emo_random,
+                    verbose=False,
+                    **gen_kwargs
+                )
+                tts, modified = run_tts_with_oom_retry(tts, infer_kwargs, _reinit, verbose=True)
+                if 'max_mel_tokens' in modified:
+                    gen_kwargs['max_mel_tokens'] = modified['max_mel_tokens']
+            except RuntimeError as e:
+                if 'CUDA out of memory' in str(e):
+                    evt = get_last_oom_event().to_dict()
                     if os.path.exists(tmp_path):
-                        try:
-                            os.remove(tmp_path)
-                        except Exception:
-                            pass
-                    raise HTTPException(status_code=500, detail=f"TTS engine failed: {rt_err}")
-            except Exception as e:
+                        try: os.remove(tmp_path)
+                        except Exception: pass
+                    raise HTTPException(status_code=500, detail=f"CUDA OOM fallback failed: {evt}")
                 if os.path.exists(tmp_path):
-                    try:
-                        os.remove(tmp_path)
-                    except Exception:
-                        pass
+                    try: os.remove(tmp_path)
+                    except Exception: pass
                 raise HTTPException(status_code=500, detail=f"TTS engine failed: {e}")
 
             if not os.path.exists(tmp_path):
