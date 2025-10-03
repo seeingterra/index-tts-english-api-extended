@@ -4,7 +4,7 @@ import io
 import time
 import tempfile
 import hashlib
-from indextts.utils.oom_fallback import run_tts_with_oom_retry, get_last_oom_event
+from indextts.utils.oom_fallback import run_tts_with_oom_retry, get_last_oom_event, render_prometheus_metrics
 from collections import OrderedDict
 from typing import Literal
 
@@ -813,6 +813,10 @@ async def debug_resolve(request: Request):
 async def health():
     evt = get_last_oom_event().to_dict()
     return {"status": "ok", "last_oom": evt}
+
+@app.get('/v1/metrics')
+async def metrics():
+    return Response(content=render_prometheus_metrics(), media_type='text/plain; version=0.0.4')
 
 
 @app.post('/v1/debug/resolve_verbose')

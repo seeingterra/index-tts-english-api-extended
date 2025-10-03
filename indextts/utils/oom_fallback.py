@@ -29,6 +29,43 @@ class OOMEvent:
 
 _LAST_EVENT = OOMEvent()
 
+# Metrics counters (simple in-memory; reset only on process restart)
+_OOM_TOTAL = 0
+_OOM_ALT_DEVICE = 0
+_OOM_SAME_DEVICE = 0
+_OOM_DISABLED = 0
+_OOM_FAILED = 0
+
+def get_oom_metrics() -> dict:
+    return {
+        'oom_total': _OOM_TOTAL,
+        'oom_alt_device': _OOM_ALT_DEVICE,
+        'oom_same_device': _OOM_SAME_DEVICE,
+        'oom_disabled': _OOM_DISABLED,
+        'oom_failed': _OOM_FAILED,
+    }
+
+def render_prometheus_metrics() -> str:
+    m = get_oom_metrics()
+    lines = [
+        '# HELP indextts_oom_total Total CUDA OOM events encountered',
+        '# TYPE indextts_oom_total counter',
+        f'indextts_oom_total {m["oom_total"]}',
+        '# HELP indextts_oom_alt_device Total OOM fallbacks that moved to an alternate GPU',
+        '# TYPE indextts_oom_alt_device counter',
+        f'indextts_oom_alt_device {m["oom_alt_device"]}',
+        '# HELP indextts_oom_same_device Total OOM fallbacks that retried on same GPU',
+        '# TYPE indextts_oom_same_device counter',
+        f'indextts_oom_same_device {m["oom_same_device"]}',
+        '# HELP indextts_oom_disabled OOM events where retry was disabled',
+        '# TYPE indextts_oom_disabled counter',
+        f'indextts_oom_disabled {m["oom_disabled"]}',
+        '# HELP indextts_oom_failed OOM events where all fallback strategies failed',
+        '# TYPE indextts_oom_failed counter',
+        f'indextts_oom_failed {m["oom_failed"]}',
+    ]
+    return '\n'.join(lines) + '\n'
+
 def get_last_oom_event() -> OOMEvent:
     return _LAST_EVENT
 
@@ -73,6 +110,7 @@ def run_tts_with_oom_retry(
       INDEXTTS_OOM_REDUCE_FACTOR_ALT, INDEXTTS_OOM_REDUCE_FACTOR_SAME, INDEXTTS_OOM_VERBOSE
     """
     global _LAST_EVENT
+    global _OOM_TOTAL, _OOM_ALT_DEVICE, _OOM_SAME_DEVICE, _OOM_DISABLED, _OOM_FAILED
     _LAST_EVENT = OOMEvent(occurred=False)
 
     try:
@@ -83,6 +121,7 @@ def run_tts_with_oom_retry(
             raise
         if os.getenv('INDEXTTS_OOM_RETRY', '1') != '1':
             _LAST_EVENT = OOMEvent(occurred=True, fallback_strategy='disabled', original_device=getattr(tts, 'device', None), error='retry disabled', timestamp=time.time())
+            _OOM_TOTAL += 1; _OOM_DISABLED += 1
             raise
         # Begin fallback
         original_device = getattr(tts, 'device', None)
@@ -129,6 +168,7 @@ def run_tts_with_oom_retry(
                 _LAST_EVENT = OOMEvent(occurred=True, fallback_strategy='alt_device', original_device=original_device,
                                        alt_device=alt_device, reduce_factor=reduce_alt,
                                        max_mel_tokens_new=call_kwargs.get('max_mel_tokens'), timestamp=time.time())
+                _OOM_TOTAL += 1; _OOM_ALT_DEVICE += 1
                 return new_tts, call_kwargs
             except Exception as alt_err:
                 if verbose:
@@ -147,8 +187,10 @@ def run_tts_with_oom_retry(
             tts.infer(**call_kwargs)
             _LAST_EVENT = OOMEvent(occurred=True, fallback_strategy='same_device', original_device=original_device,
                                    reduce_factor=reduce_same, max_mel_tokens_new=call_kwargs.get('max_mel_tokens'), timestamp=time.time())
+            _OOM_TOTAL += 1; _OOM_SAME_DEVICE += 1
             return tts, call_kwargs
         except Exception as same_err:
             _LAST_EVENT = OOMEvent(occurred=True, fallback_strategy='failed', original_device=original_device,
                                    error=str(same_err), timestamp=time.time())
+            _OOM_TOTAL += 1; _OOM_FAILED += 1
             raise
