@@ -1,89 +1,100 @@
 <div align="center">
-<img src='assets/index_icon.png' width="250"/>
+  <img src='assets/index_icon.png' width="240" alt="IndexTTS2 Logo"/>
+  <h1>IndexTTS2</h1>
+  <p><strong>Emotionally expressive, duration‑controllable, zero‑shot autoregressive TTS</strong></p>
+  <p>
+    <a href="docs/INDEX.md" title="Documentation Index">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Docs-Index-0A84FF?logo=readthedocs&logoColor=white" />
+        <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/Docs-Index-blue?logo=readthedocs" />
+        <img src="https://img.shields.io/badge/Docs-Index-blue?logo=readthedocs" alt="Docs Index" />
+      </picture>
+    </a>
+    <a href="docs/VOXTA_INTEGRATION.md" title="Voxta Integration Guide">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Voxta_Integration-16A34A?logo=fastapi&logoColor=white" />
+        <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/Voxta_Integration-success?logo=fastapi" />
+        <img src="https://img.shields.io/badge/Voxta_Integration-success?logo=fastapi" alt="Voxta Integration" />
+      </picture>
+    </a>
+    <a href="#gpu-requirements" title="GPU Requirements (8GB+ Recommended)">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/GPU-CUDA_8GB%2B-7E22CE?logo=nvidia&logoColor=white" />
+        <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/GPU-CUDA_8GB%2B-brightgreen?logo=nvidia" />
+        <img src="https://img.shields.io/badge/GPU-CUDA_8GB%2B-brightgreen?logo=nvidia" alt="GPU 8GB+" />
+      </picture>
+    </a>
+    <a href="#gpu-requirements" title="CPU fallback not supported">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/CPU-No__Fallback-DC2626?logo=powershell&logoColor=white" />
+        <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/CPU-No__Fallback-red?logo=powershell" />
+        <img src="https://img.shields.io/badge/CPU-No__Fallback-red?logo=powershell" alt="No CPU fallback" />
+      </picture>
+    </a>
+    <a href='https://arxiv.org/abs/2506.21619'><img src='https://img.shields.io/badge/ArXiv-2506.21619-red?logo=arxiv' alt='ArXiv'/></a>
+    <a href='https://huggingface.co/IndexTeam/IndexTTS-2'><img src='https://img.shields.io/badge/HuggingFace-Model-blue?logo=huggingface' alt='HuggingFace Model'/></a>
+    <a href='https://modelscope.cn/models/IndexTeam/IndexTTS-2'><img src='https://img.shields.io/badge/ModelScope-Model-purple?logo=modelscope' alt='ModelScope Model'/></a>
+  </p>
+  <p>
+    <em>Quick links:</em>
+    <a href="docs/INDEX.md">Docs Index</a> ·
+    <a href="docs/VOXTA_INTEGRATION.md">Voxta Integration</a> ·
+    <a href="#-standalone-fastapi--voxta-compatible-api-quickstart">Standalone API</a>
+  </p>
 </div>
 
+---
 
-<div align="center">
-  <a href="docs/INDEX.md" title="Documentation Index">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Docs-Index-0A84FF?logo=readthedocs&logoColor=white" />
-      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/Docs-Index-blue?logo=readthedocs" />
-      <img src="https://img.shields.io/badge/Docs-Index-blue?logo=readthedocs" alt="Documentation Index" />
-    </picture>
-  </a>
-  <a href="docs/VOXTA_INTEGRATION.md" title="Voxta Integration Guide">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Voxta_Integration-16A34A?logo=fastapi&logoColor=white" />
-      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/Voxta_Integration-success?logo=fastapi" />
-      <img src="https://img.shields.io/badge/Voxta_Integration-success?logo=fastapi" alt="Voxta Integration" />
-    </picture>
-  </a>
-  <a href="#gpu-requirements" title="GPU Requirements (CUDA 8GB+ Recommended)">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/GPU-CUDA_8GB%2B-7E22CE?logo=nvidia&logoColor=white" />
-      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/GPU-CUDA_8GB%2B-brightgreen?logo=nvidia" />
-      <img src="https://img.shields.io/badge/GPU-CUDA_8GB%2B-brightgreen?logo=nvidia" alt="GPU: CUDA 8GB+" />
-    </picture>
-  </a>
-  <a href="#gpu-requirements" title="CPU Fallback Not Supported">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/CPU-No__Fallback-DC2626?logo=powershell&logoColor=white" />
-      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/CPU-No__Fallback-red?logo=powershell" />
-      <img src="https://img.shields.io/badge/CPU-No__Fallback-red?logo=powershell" alt="CPU: No fallback" />
-    </picture>
-  </a>
-</div>
+## Overview
 
-> Quick links: [Docs Index](docs/INDEX.md) · [Voxta Integration](docs/VOXTA_INTEGRATION.md) · [Standalone API Quickstart](#-standalone-fastapi--voxta-compatible-api-quickstart)
+IndexTTS2 is a next‑generation autoregressive zero‑shot text‑to‑speech system with:
 
-<div align="center">
-<a href="README.md" style="font-size: 24px">English</a>
-## IndexTTS2
+* Precise and optional duration control (token budgeting)
+* High‑fidelity emotion transfer disentangled from timbre
+* Zero‑shot voice cloning from short prompts
+* Deterministic + cached inference options
+* A standalone FastAPI backend (no Gradio dependency) with Voxta compatibility
 
-<center><h3>IndexTTS2: A Breakthrough in Emotionally Expressive and Duration-Controlled Auto-Regressive Zero-Shot Text-to-Speech</h3></center>
+If you only want to try it quickly, jump to the Quickstart below. For deeper integration, see the documentation index.
 
-2. Clone the repository and fetch large files (Windows PowerShell):
+> NOTE: A CUDA build of PyTorch is required. CPU‑only execution is not supported for IndexTTS2 inference.
+
+## Quickstart (Web UI)
 
 ```powershell
 git clone https://github.com/seeingterra/index-tts-english-api-extended.git
 cd index-tts-english-api-extended
 git lfs pull
+python -m venv .venv
+./.venv/Scripts/Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .[webui]
+python webui.py
 ```
-  <a href='https://arxiv.org/abs/2506.21619'>
-    <img src='https://img.shields.io/badge/ArXiv-2506.21619-red?logo=arxiv'/>
-If you prefer using a mirror for faster downloads, pass the `-i` option to pip. Example:
+
+Then open http://127.0.0.1:7860
+
+### Optional: Faster package mirrors
+
+If you need a regional Python package mirror, you can pass the `-i/--index-url` flag to pip:
 
 ```powershell
 python -m pip install -e . -i https://mirrors.aliyun.com/pypi/simple/
 ```
-<!-- mirrors omitted for brevity -->
-  </a>
-  <a href='https://huggingface.co/IndexTeam/IndexTTS-2'>
-    <img src='https://img.shields.io/badge/HuggingFace-Model-blue?logo=huggingface' />
-  </a>
-  <br/>
-  <!--a href='https://modelscope.cn/studios/IndexTeam/IndexTTS-Demo'>
-    <img src='https://img.shields.io/badge/ModelScope-Demo-purple?logo=modelscope'/>
-  </a-->
-  <a href='https://modelscope.cn/models/IndexTeam/IndexTTS-2'>
-    <img src='https://img.shields.io/badge/ModelScope-Model-purple?logo=modelscope'/>
-  </a>
-</div>
 
+## Abstract
 
-### Abstract
+Existing autoregressive large-scale text‑to‑speech (TTS) models offer strong naturalness, but token‑by‑token generation makes precise duration control difficult. This limits audio‑visual synchronization for tasks like dubbing.
 
-Existing autoregressive large-scale text-to-speech (TTS) models have advantages in speech naturalness, but their token-by-token generation mechanism makes it difficult to precisely control the duration of synthesized speech. This becomes a significant limitation in applications requiring strict audio-visual synchronization, such as video dubbing.
+IndexTTS2 introduces a general, autoregressive‑friendly method for speech duration control.
 
-This paper introduces IndexTTS2, which proposes a novel, general, and autoregressive model-friendly method for speech duration control.
+Two generation modes are supported: (1) constrained token count for explicit duration control and (2) free autoregressive generation preserving prompt prosody.
 
-The method supports two generation modes: one explicitly specifies the number of generated tokens to precisely control speech duration; the other freely generates speech in an autoregressive manner without specifying the number of tokens, while faithfully reproducing the prosodic features of the input prompt.
+IndexTTS2 disentangles emotional expression from speaker identity, enabling independent control of timbre and emotion. Zero‑shot, it reconstructs a target timbre while applying a chosen emotional tone.
 
-Furthermore, IndexTTS2 achieves disentanglement between emotional expression and speaker identity, enabling independent control over timbre and emotion. In the zero-shot setting, the model can accurately reconstruct the target timbre (from the timbre prompt) while perfectly reproducing the specified emotional tone (from the style prompt).
+We incorporate GPT latent representations and a three‑stage training strategy to stabilize highly emotional speech. A soft instruction mechanism (fine‑tuned on descriptive prompts) lowers the barrier to textual emotion control.
 
-To enhance speech clarity in highly emotional expressions, we incorporate GPT latent representations and design a novel three-stage training paradigm to improve the stability of the generated speech. Additionally, to lower the barrier for emotional control, we designed a soft instruction mechanism based on text descriptions by fine-tuning Qwen3, effectively guiding the generation of speech with the desired emotional orientation.
-
-Finally, experimental results on multiple datasets show that IndexTTS2 outperforms state-of-the-art zero-shot TTS models in terms of word error rate, speaker similarity, and emotional fidelity. Audio samples are available at: <a href="https://index-tts.github.io/index-tts2.github.io/">IndexTTS2 demo page</a>.
+Experiments across multiple datasets show state‑of‑the‑art performance in word error rate, speaker similarity, and emotional fidelity. Audio samples: <a href="https://index-tts.github.io/index-tts2.github.io/">IndexTTS2 demo page</a>.
 Run the web UI with your Python interpreter (after activating the project venv):
 
 ```powershell
