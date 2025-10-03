@@ -79,12 +79,13 @@ def select_device(require_cuda: bool = True) -> Tuple[str, bool]:
     gpu_infos = _query_gpu_memory()
 
     auto_fp16 = False
+    selected_info = None  # (idx, free, total)
     if device is None:
         if gpu_infos:
             # Try full precision first
             for idx, free, total in sorted(gpu_infos, key=lambda x: -x[1]):
                 if free >= required_vram:
-                    device = f"cuda:{idx}"
+                    device = f"cuda:{idx}"; selected_info = (idx, free, total)
                     break
             # Try fp16 fallback
             if device is None and allow_auto_fp16:
@@ -92,17 +93,17 @@ def select_device(require_cuda: bool = True) -> Tuple[str, bool]:
                 for idx, free, total in sorted(gpu_infos, key=lambda x: -x[1]):
                     if free >= half_req:
                         print(f">> Not enough VRAM for fp32 (need {required_vram}MB); enabling fp16 on cuda:{idx}")
-                        device = f"cuda:{idx}"; auto_fp16 = True
+                        device = f"cuda:{idx}"; auto_fp16 = True; selected_info = (idx, free, total)
                         break
             # Still none: pick GPU with most free
             if device is None:
                 best = max(gpu_infos, key=lambda x: x[1])
                 print(f">> No GPU meets VRAM target ({required_vram}MB); selecting cuda:{best[0]} (free {best[1]}MB)")
-                device = f"cuda:{best[0]}"
+                device = f"cuda:{best[0]}"; selected_info = best
         else:
             # Interactive multi-device fallback
             if dev_count <= 1:
-                device = "cuda:0"
+                device = "cuda:0"; selected_info = (0, 0, 0)
             else:
                 if sys.stdin and sys.stdin.isatty():
                     try:
@@ -118,17 +119,30 @@ def select_device(require_cuda: bool = True) -> Tuple[str, bool]:
                         if sel < 0 or sel >= dev_count:
                             print(f">> Selection {sel} out of range; using 0")
                             sel = 0
-                        device = f"cuda:{sel}"
+                        device = f"cuda:{sel}"; selected_info = (sel, 0, 0)
                     except Exception:
-                        device = "cuda:0"
+                        device = "cuda:0"; selected_info = (0, 0, 0)
                 else:
-                    device = "cuda:0"
+                    device = "cuda:0"; selected_info = (0, 0, 0)
 
     # Determine fp16 usage
     force_fp16 = os.getenv('INDEXTTS_USE_FP16', '0').strip().lower() in ('1','true','yes')
     use_fp16 = force_fp16 or auto_fp16
     if use_fp16:
         print(f">> FP16 enabled ({'forced' if force_fp16 else 'auto'}).")
+
+    # Always print a concise selection summary unless explicitly disabled.
+    if os.getenv('INDEXTTS_DEVICE_LOG', '1').strip().lower() not in ('0','false','no'):
+        if selected_info and selected_info[1] and selected_info[2]:
+            idx, free, total = selected_info
+            print(f">> Device selection summary: {device} free={free}MB total={total}MB fp16={use_fp16}")
+        else:
+            # Fallback if memory stats not available
+            try:
+                name = torch.cuda.get_device_name(int(device.split(':')[-1]))
+            except Exception:
+                name = device
+            print(f">> Device selection summary: {device} ({name}) fp16={use_fp16}")
 
     # Allocator tuning + optional memory cap
     os.environ.setdefault('TORCH_CUDA_ALLOC_CONF', os.getenv('TORCH_CUDA_ALLOC_CONF', 'max_split_size_mb:64'))
