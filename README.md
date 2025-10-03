@@ -34,6 +34,12 @@
     <a href='https://arxiv.org/abs/2506.21619'><img src='https://img.shields.io/badge/ArXiv-2506.21619-red?logo=arxiv' alt='ArXiv'/></a>
     <a href='https://huggingface.co/IndexTeam/IndexTTS-2'><img src='https://img.shields.io/badge/HuggingFace-Model-blue?logo=huggingface' alt='HuggingFace Model'/></a>
     <a href='https://modelscope.cn/models/IndexTeam/IndexTTS-2'><img src='https://img.shields.io/badge/ModelScope-Model-purple?logo=modelscope' alt='ModelScope Model'/></a>
+    <a href='LICENSE'><img src='https://img.shields.io/badge/License-Bilibili%20Model%20Use-orange' alt='License: Bilibili Model Use'/></a>
+    <a href='#overview'><img src='https://img.shields.io/badge/Version-2.0.0-informational' alt='Version 2.0.0'/></a>
+    <a href='pyproject.toml'><img src='https://img.shields.io/badge/Python-3.10%2B-blue?logo=python' alt='Python 3.10+'/></a>
+    <img src='https://img.shields.io/badge/Status-Production%2FStable-success' alt='Status: Production/Stable'/>
+    <a href='#-standalone-fastapi--voxta-compatible-api-quickstart'><img src='https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi' alt='FastAPI'/></a>
+    <img src='https://img.shields.io/badge/Framework-PyTorch%20CUDA-ee4c2c?logo=pytorch' alt='Framework: PyTorch CUDA Required'/>
   </p>
   <p>
     <em>Quick links:</em>
