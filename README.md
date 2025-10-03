@@ -216,6 +216,27 @@ CPU fallback is intentionally disabled: a CUDA‑enabled PyTorch build is requir
 | `INDEXTTS_DEVICE_VERBOSE` | Verbose GPU probing logs | `INDEXTTS_DEVICE_VERBOSE=1` |
 | `INDEXTTS_DEVICE_LOG` | Suppress device summary when 0 | `INDEXTTS_DEVICE_LOG=0` |
 
+#### OOM Fallback (Automatic Retry)
+
+When a generation fails with `CUDA out of memory`, the API now attempts a staged fallback:
+
+1. Probe alternative GPUs and, if one has sufficient free memory (> ~512MB headroom), reinitialize the model there in fp16 and retry with a modestly reduced `max_mel_tokens`.
+2. If no alternative GPU qualifies, retry in place on the same device with fp16 (if not already) and a more aggressive reduction of `max_mel_tokens`.
+3. If all retries fail, the request returns HTTP 500 detailing the fallback phase that failed.
+
+Environment toggles (optional — defaults are conservative and enabled implicitly):
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `INDEXTTS_OOM_RETRY` | Enable OOM retry logic | `1` |
+| `INDEXTTS_OOM_ALT_GPU` | Allow switching to another GPU | `1` |
+| `INDEXTTS_OOM_MIN_FREE_MB` | Minimum free MB required to consider an alt GPU | `512` |
+| `INDEXTTS_OOM_REDUCE_FACTOR_ALT` | Multiply `max_mel_tokens` by this when moving to another GPU | `0.7` |
+| `INDEXTTS_OOM_REDUCE_FACTOR_SAME` | Multiply `max_mel_tokens` when staying on same GPU | `0.6` |
+| `INDEXTTS_OOM_VERBOSE` | Extra logging for fallback decisions | `0` |
+
+Note: Current implementation has fixed inline thresholds; these env vars are planned (roadmap) unless already surfaced in code. If absent, behavior follows the description above. Adjust the model prompt length and `max_mel_tokens` proactively on smaller cards to avoid fallback overhead.
+
 ### Selecting a Device
 
 The service queries `nvidia-smi` for free memory and picks a suitable device. On interactive TTY runs (WebUI, standalone API, scripts) an **interactive GPU selection menu** is shown by default when multiple GPUs exist (can be disabled with `INDEXTTS_INTERACTIVE_SELECT=0`).

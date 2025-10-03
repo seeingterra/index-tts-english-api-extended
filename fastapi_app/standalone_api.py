@@ -697,17 +697,117 @@ async def create_speech(request: Request, speech_request: SpeechRequest):
         if format_requested and format_requested != 'wav':
             print(f">> Voxta requested format='{format_requested}', but only 'wav' is supported. Ignoring and returning wav.")
 
-        tts.infer(spk_audio_prompt=full_prompt_path,
-                  text=speech_request.input,
-                  output_path=tmp_path,
-                  emo_audio_prompt=emo_audio_prompt,
-                  emo_alpha=emo_weight,
-                  emo_vector=emo_vector,
-                  use_emo_text=use_emo_text,
-                  emo_text=emo_text_value,
-                  use_random=speech_request.emo_random,
-                  verbose=True,
-                  **gen_kwargs)
+        try:
+            tts.infer(spk_audio_prompt=full_prompt_path,
+                      text=speech_request.input,
+                      output_path=tmp_path,
+                      emo_audio_prompt=emo_audio_prompt,
+                      emo_alpha=emo_weight,
+                      emo_vector=emo_vector,
+                      use_emo_text=use_emo_text,
+                      emo_text=emo_text_value,
+                      use_random=speech_request.emo_random,
+                      verbose=True,
+                      **gen_kwargs)
+        except RuntimeError as rt_err:
+            import torch as _torch
+            err_msg = str(rt_err)
+            if 'CUDA out of memory' in err_msg:
+                print('>> OOM detected during inference. Attempting automatic failover...')
+                try:
+                    # Identify current device index
+                    current_dev = None
+                    try:
+                        current_dev = tts.device if hasattr(tts, 'device') else None
+                    except Exception:
+                        pass
+                    current_idx = None
+                    if current_dev and isinstance(current_dev, str) and current_dev.startswith('cuda:'):
+                        try:
+                            current_idx = int(current_dev.split(':')[1])
+                        except Exception:
+                            current_idx = None
+                    # Enumerate other GPUs and pick one with most free memory that isn't current
+                    alt_device = None
+                    free_list = []
+                    try:
+                        import subprocess as _sub
+                        out = _sub.check_output(['nvidia-smi','--query-gpu=index,memory.total,memory.used','--format=csv,noheader,nounits'], universal_newlines=True, stderr=_sub.DEVNULL)
+                        for line in out.strip().splitlines():
+                            parts = [p.strip() for p in line.split(',')]
+                            if len(parts) >= 3:
+                                idx = int(parts[0]); total = int(parts[1]); used = int(parts[2]); free = total - used
+                                if current_idx is not None and idx == current_idx:
+                                    continue
+                                free_list.append((idx, free, total))
+                    except Exception:
+                        pass
+                    if free_list:
+                        free_list.sort(key=lambda x: -x[1])
+                        cand_idx, cand_free, cand_total = free_list[0]
+                        # Require at least some headroom ( > 512MB free )
+                        if cand_free > 512:
+                            alt_device = f'cuda:{cand_idx}'
+                            print(f">> Failover candidate: {alt_device} free={cand_free}MB total={cand_total}MB")
+                    if alt_device is None:
+                        print('>> No alternative GPU with sufficient free memory found; trying in-place fp16 + reduced tokens.')
+                        # Try in-place strategy: enable fp16 and shrink max_mel_tokens
+                        try:
+                            if not gen_kwargs.get('do_sample'):
+                                pass
+                            # Reduce mel tokens by 40%
+                            gen_kwargs['max_mel_tokens'] = max(256, int(gen_kwargs['max_mel_tokens'] * 0.6))
+                            print(f">> Retrying on same device with fp16={True} max_mel_tokens={gen_kwargs['max_mel_tokens']}")
+                            # Re-init model in fp16 on same device if not already
+                            if hasattr(tts, 'use_fp16') and not tts.use_fp16:
+                                # Recreate model quickly (lazy simple approach)
+                                from indextts.infer_v2 import IndexTTS2 as _IndexTTS2
+                                new_tts = _IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=True, use_cuda_kernel=False, use_deepspeed=False, device=current_dev)
+                                tts_instance_local = new_tts
+                                globals()['tts_instance'] = new_tts
+                                tts = new_tts
+                            tts.infer(spk_audio_prompt=full_prompt_path,
+                                      text=speech_request.input,
+                                      output_path=tmp_path,
+                                      emo_audio_prompt=emo_audio_prompt,
+                                      emo_alpha=emo_weight,
+                                      emo_vector=emo_vector,
+                                      use_emo_text=use_emo_text,
+                                      emo_text=emo_text_value,
+                                      use_random=speech_request.emo_random,
+                                      verbose=True,
+                                      **gen_kwargs)
+                        except Exception as inner_e:
+                            raise HTTPException(status_code=500, detail=f"CUDA OOM and fallback failed: {inner_e}")
+                    else:
+                        # Recreate model on alt_device with fp16 enforced and reduced tokens
+                        try:
+                            from indextts.infer_v2 import IndexTTS2 as _IndexTTS2
+                            reduced_tokens = max(256, int(gen_kwargs['max_mel_tokens'] * 0.7))
+                            print(f">> Reinitializing model on {alt_device} with fp16=1 max_mel_tokens={reduced_tokens}")
+                            new_tts = _IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=True, use_cuda_kernel=False, use_deepspeed=False, device=alt_device)
+                            globals()['tts_instance'] = new_tts
+                            tts = new_tts
+                            gen_kwargs['max_mel_tokens'] = reduced_tokens
+                            tts.infer(spk_audio_prompt=full_prompt_path,
+                                      text=speech_request.input,
+                                      output_path=tmp_path,
+                                      emo_audio_prompt=emo_audio_prompt,
+                                      emo_alpha=emo_weight,
+                                      emo_vector=emo_vector,
+                                      use_emo_text=use_emo_text,
+                                      emo_text=emo_text_value,
+                                      use_random=speech_request.emo_random,
+                                      verbose=True,
+                                      **gen_kwargs)
+                        except Exception as reinit_err:
+                            raise HTTPException(status_code=500, detail=f"CUDA OOM fallback (alt GPU) failed: {reinit_err}")
+                except HTTPException:
+                    raise
+                except Exception as fallback_error:
+                    raise HTTPException(status_code=500, detail=f"CUDA OOM and no successful fallback: {fallback_error}")
+            else:
+                raise
 
         if not os.path.exists(tmp_path):
             raise HTTPException(status_code=500, detail='TTS engine did not produce output file')
