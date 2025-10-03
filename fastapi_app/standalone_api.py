@@ -250,7 +250,11 @@ async def get_tts_instance():
 
         print('>> Selecting GPU device (unified selector)...')
         # Force interactive menu if available for API startup by setting INDEXTTS_INTERACTIVE_SELECT=1 (default already enabled)
-        device, auto_fp16 = select_device(require_cuda=True)
+        try:
+            device, auto_fp16 = select_device(require_cuda=True)
+        except Exception as sel_err:
+            # Provide clearer guidance and abort initialization
+            raise RuntimeError(f"GPU device selection failed: {sel_err}") from sel_err
 
         # Optionally enable fp16 via explicit env var or due to automatic selection
         use_fp16_env = os.getenv('INDEXTTS_USE_FP16', '0')

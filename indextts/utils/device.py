@@ -98,6 +98,7 @@ def select_device(require_cuda: bool = True) -> Tuple[str, bool]:
     force_val = os.getenv('INDEXTTS_FORCE_DEVICE')  # accepts 'auto', index, or cuda:X
     env_val = os.getenv('INDEXTTS_CUDA_DEVICE')
     dev_count = torch.cuda.device_count()
+    device = None  # ensure defined
     if force_val and force_val.strip().lower() != 'auto':
         try:
             fv = force_val.strip()
@@ -123,12 +124,9 @@ def select_device(require_cuda: bool = True) -> Tuple[str, bool]:
                 device = f"cuda:{idx}"
             else:
                 print(f">> INDEXTTS_CUDA_DEVICE={env_val} out of range; falling back to auto selection")
-                device = None
         except Exception:
             print(f">> Could not parse INDEXTTS_CUDA_DEVICE='{env_val}'; auto-selecting")
-            device = None
-    else:
-        device = None
+            # leave device as None for auto path
 
     required_vram = int(os.getenv('INDEXTTS_REQUIRED_VRAM_MB', '10000'))
     allow_auto_fp16 = os.getenv('INDEXTTS_ALLOW_AUTO_FP16', '1').strip().lower() in ('1','true','yes')
