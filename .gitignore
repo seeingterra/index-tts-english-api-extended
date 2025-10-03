@@ -40,3 +40,31 @@ desktop.ini
 /checkpoints/*
 !/checkpoints/*.yaml
 /outputs/
+ 
+# Ignore newly added large example audio assets except the original curated demo set.
+# Keep the originally tracked demo voices (voice_01..voice_12, emo_hate.wav, emo_sad.wav, cases.jsonl).
+# Ignore any other .wav or .mp3 in examples/ to avoid bloating the repo.
+examples/*.wav
+examples/*.mp3
+!examples/voice_0?.wav
+!examples/voice_10.wav
+!examples/voice_11.wav
+!examples/voice_12.wav
+!examples/emo_hate.wav
+!examples/emo_sad.wav
+!examples/cases.jsonl
+
+# Ignore reference transcription sidecar files created during experimentation.
+examples/*.ref_text.txt
+
+# Ignore runtime / debug logs at repo root.
+*.log
+server_8011*.err
+uvicorn_*.log
+
+# Ignore ad‑hoc test output wavs at root.
+test_output_*.wav
+
+# Ignore temporary helper scripts not meant for distribution.
+tmp_test_discover.py
+
