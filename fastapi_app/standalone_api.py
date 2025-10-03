@@ -243,130 +243,12 @@ async def get_tts_instance():
         #  - TORCH_CUDA_ALLOC_CONF can be supplied externally; we set a reasonable default if not present.
         os.environ.setdefault('TORCH_CUDA_ALLOC_CONF', os.getenv('TORCH_CUDA_ALLOC_CONF', 'max_split_size_mb:64'))
         import torch
-
-        # Optionally set per-process memory fraction to avoid exhausting the whole GPU
-        mem_frac = os.getenv('INDEXTTS_CUDA_MEM_FRACTION')
-        if mem_frac:
-            try:
-                frac = float(mem_frac)
-                if 0.0 < frac <= 1.0:
-                    try:
-                        torch.cuda.set_per_process_memory_fraction(frac, int(device.split(':')[-1]) if isinstance(device, str) and 'cuda' in device else 0)
-                        print(f">> Set per-process CUDA memory fraction to {frac}")
-                    except Exception as e:
-                        print(f">> Failed to set per-process memory fraction: {e}")
-            except Exception:
-                print(f">> Invalid INDEXTTS_CUDA_MEM_FRACTION='{mem_frac}', must be float in (0,1]")
-    # Enforce CUDA-only: do not allow CPU fallback
+        from indextts.utils.device import select_device
+        # Enforce CUDA-only: do not allow CPU fallback
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA not available. This standalone API requires a CUDA-enabled PyTorch. Install CUDA-enabled torch and restart the service.")
 
-        # GPU selection: try to pick a GPU with enough free VRAM. Fallbacks:
-        # 1) INDEXTTS_CUDA_DEVICE env var
-        # 2) pick GPU with free memory >= INDEXTTS_REQUIRED_VRAM_MB
-        # 3) if not available and INDEXTTS_ALLOW_AUTO_FP16=1, enable fp16 and retry with half requirement
-        # 4) if still not available, pick GPU with max free memory and warn
-
-        def _query_gpu_memory():
-            """Return list of (index, free_mb, total_mb). Uses nvidia-smi when available."""
-            try:
-                out = subprocess.check_output(['nvidia-smi', '--query-gpu=index,memory.total,memory.used', '--format=csv,noheader,nounits'], stderr=subprocess.DEVNULL, universal_newlines=True)
-                lines = [l.strip() for l in out.splitlines() if l.strip()]
-                res = []
-                for line in lines:
-                    parts = [p.strip() for p in line.split(',')]
-                    if len(parts) >= 3:
-                        idx = int(parts[0]); total = int(parts[1]); used = int(parts[2]); free = total - used
-                        res.append((idx, free, total))
-                return res
-            except Exception:
-                # Fallback: try torch cuda properties
-                try:
-                    infos = []
-                    cnt = torch.cuda.device_count()
-                    for i in range(cnt):
-                        prop = torch.cuda.get_device_properties(i)
-                        total = int(prop.total_memory / (1024*1024))
-                        # used unknown here; set free=total to prefer devices
-                        infos.append((i, total, total))
-                    return infos
-                except Exception:
-                    return []
-
-        def _choose_cuda_device():
-            env_val = os.getenv('INDEXTTS_CUDA_DEVICE')
-            dev_count = 0
-            try:
-                dev_count = torch.cuda.device_count()
-            except Exception:
-                dev_count = 0
-
-            # Respect explicit env var
-            if env_val:
-                try:
-                    if isinstance(env_val, str) and env_val.startswith('cuda:'):
-                        idx = int(env_val.split(':', 1)[1])
-                    else:
-                        idx = int(env_val)
-                    if idx < 0 or (dev_count and idx >= dev_count):
-                        print(f">> INDEXTTS_CUDA_DEVICE={env_val} out of range, falling back to auto selection")
-                    else:
-                        return (f"cuda:{idx}", False)
-                except Exception:
-                    print(f">> Failed to parse INDEXTTS_CUDA_DEVICE='{env_val}', falling back to automatic selection")
-
-            # Default required VRAM (MB) for full-precision model; user can override
-            required_vram = int(os.getenv('INDEXTTS_REQUIRED_VRAM_MB', '10000'))
-            allow_auto_fp16 = os.getenv('INDEXTTS_ALLOW_AUTO_FP16', '1').strip() in ('1', 'true', 'True')
-
-            gpu_infos = _query_gpu_memory()
-            if gpu_infos:
-                # try to find a GPU with enough free memory
-                for idx, free, total in sorted(gpu_infos, key=lambda x: -x[1]):
-                    if free >= required_vram:
-                        return (f"cuda:{idx}", False)
-
-                # if allowed, try fp16 (halve requirement) and pick a GPU
-                if allow_auto_fp16:
-                    req2 = max(1024, required_vram // 2)
-                    for idx, free, total in sorted(gpu_infos, key=lambda x: -x[1]):
-                        if free >= req2:
-                            print(f">> Not enough VRAM for fp32; enabling fp16 and selecting cuda:{idx}")
-                            return (f"cuda:{idx}", True)
-
-                # no GPU meets requirement; pick GPU with most free memory
-                best = max(gpu_infos, key=lambda x: x[1])
-                print(f">> No GPU has required VRAM ({required_vram}MB); selecting gpu {best[0]} with free {best[1]}MB")
-                return (f"cuda:{best[0]}", False)
-
-            # No info available: if only one device, use cuda:0; if interactive, prompt; else default 0
-            if dev_count <= 1:
-                return ("cuda:0", False)
-
-            try:
-                if sys.stdin and sys.stdin.isatty():
-                    print(f">> Detected {dev_count} CUDA devices:")
-                    for i in range(dev_count):
-                        try:
-                            name = torch.cuda.get_device_name(i)
-                        except Exception:
-                            name = f"cuda:{i}"
-                        print(f"   [{i}] {name}")
-                    sel_raw = input(f"Select device index to use for IndexTTS2 [0-{dev_count-1}] (default 0): ")
-                    try:
-                        sel = int(sel_raw) if sel_raw.strip() != '' else 0
-                    except Exception:
-                        sel = 0
-                    if sel < 0 or sel >= dev_count:
-                        print(f">> Selection {sel} out of range, using 0")
-                        sel = 0
-                    return (f"cuda:{sel}", False)
-            except Exception:
-                pass
-
-            return ("cuda:0", False)
-
-        device, auto_fp16 = _choose_cuda_device()
+        device, auto_fp16 = select_device(require_cuda=True)
 
         # Optionally enable fp16 via explicit env var or due to automatic selection
         use_fp16_env = os.getenv('INDEXTTS_USE_FP16', '0')
@@ -374,20 +256,7 @@ async def get_tts_instance():
         if use_fp16:
             print('>> INDEXTTS_USE_FP16 enabled: IndexTTS2 will attempt to use fp16 where supported')
 
-        # If the user requested per-process memory fraction, apply it now (after device is chosen)
-        mem_frac = os.getenv('INDEXTTS_CUDA_MEM_FRACTION')
-        if mem_frac:
-            try:
-                frac = float(mem_frac)
-                if 0.0 < frac <= 1.0:
-                    try:
-                        dev_idx = int(device.split(':')[-1]) if isinstance(device, str) and 'cuda' in device else 0
-                        torch.cuda.set_per_process_memory_fraction(frac, dev_idx)
-                        print(f">> Set per-process CUDA memory fraction to {frac} on {device}")
-                    except Exception as e:
-                        print(f">> Failed to set per-process memory fraction: {e}")
-            except Exception:
-                print(f">> Invalid INDEXTTS_CUDA_MEM_FRACTION='{mem_frac}', must be float in (0,1]")
+        # Memory fraction already applied by select_device if env var set.
 
     print(f">> Initializing IndexTTS2 (device={device or 'cpu'}) ...")
     # Match example usage: explicitly disable fp16/deepspeed unless desired

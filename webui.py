@@ -18,6 +18,7 @@ sys.path.append(current_dir)
 sys.path.append(os.path.join(current_dir, "indextts"))
 
 import argparse
+from indextts.utils.device import select_device
 parser = argparse.ArgumentParser(
     description="IndexTTS WebUI",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -55,11 +56,18 @@ from tools.i18n.i18n import I18nAuto
 
 i18n = I18nAuto(language="Auto")
 MODE = 'local'
+# Unified device selection (honors INDEXTTS_* env vars). Command-line --fp16 forces fp16 on top.
+device, auto_fp16 = select_device(require_cuda=True)
+final_fp16 = cmd_args.fp16 or auto_fp16
+if cmd_args.fp16 and not auto_fp16:
+    print(">> FP16 explicitly requested via --fp16")
+print(f">> WebUI using device={device}, fp16={final_fp16}")
 tts = IndexTTS2(model_dir=cmd_args.model_dir,
                 cfg_path=os.path.join(cmd_args.model_dir, "config.yaml"),
-                use_fp16=cmd_args.fp16,
+                use_fp16=final_fp16,
                 use_deepspeed=cmd_args.deepspeed,
                 use_cuda_kernel=cmd_args.cuda_kernel,
+                device=device,
                 )
 # Supported languages list
 LANGUAGES = {

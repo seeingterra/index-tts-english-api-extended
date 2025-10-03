@@ -1,4 +1,5 @@
 import os
+from indextts.utils.device import select_device
 
 os.environ['HF_HUB_CACHE'] = './checkpoints/hf_cache'
 import time
@@ -42,9 +43,10 @@ class IndexTTS:
             self.use_fp16 = False if device == "cpu" else use_fp16
             self.use_cuda_kernel = use_cuda_kernel is not None and use_cuda_kernel and device.startswith("cuda")
         elif torch.cuda.is_available():
-            self.device = "cuda:0"
-            self.use_fp16 = use_fp16
-            self.use_cuda_kernel = use_cuda_kernel is None or use_cuda_kernel
+            sel_dev, auto_fp16 = select_device(require_cuda=False)
+            self.device = sel_dev
+            self.use_fp16 = use_fp16 or auto_fp16
+            self.use_cuda_kernel = (use_cuda_kernel is None or use_cuda_kernel) and self.device.startswith("cuda")
         elif hasattr(torch, "xpu") and torch.xpu.is_available():
             self.device = "xpu"
             self.use_fp16 = use_fp16
