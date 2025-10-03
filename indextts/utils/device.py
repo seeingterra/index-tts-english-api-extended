@@ -19,7 +19,7 @@ CPU fallback is only returned if CUDA is entirely unavailable; higher layers may
 from __future__ import annotations
 
 import os, sys, subprocess, re
-from typing import Tuple
+from typing import Tuple, List, Optional
 
 import torch
 
@@ -49,15 +49,71 @@ def _query_gpu_memory():
             pass
         return infos
 
+def _interactive_menu(gpu_infos: List[tuple]) -> Optional[int]:
+    """Display an interactive selection menu for GPUs.
+
+    Returns:
+        int | None: Chosen GPU index, or -1 for 'all', or None if user aborted/invalid.
+    """
+    if not gpu_infos:
+        return None
+    print("\nSelect your GPU preference:")
+    if len(gpu_infos) > 1:
+        print("  0) All CUDA devices (auto / best-fit)")
+    for i, (idx, free, total) in enumerate(gpu_infos, start=1 if len(gpu_infos) > 1 else 0):
+        label_num = i if len(gpu_infos) > 1 else i  # numbering already offset above
+        print(f"  {label_num}) GPU #{idx} - {torch.cuda.get_device_name(idx)} (free {free}MB / total {total}MB)")
+    default_choice = '1' if len(gpu_infos) > 1 else '0'
+    try:
+        raw = input(f"Enter choice [{default_choice}]: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print(">> No selection provided; using default.")
+        raw = ''
+    if raw == '':
+        raw = default_choice
+    try:
+        choice = int(raw)
+    except ValueError:
+        print(f">> Invalid selection '{raw}', using default {default_choice}.")
+        choice = int(default_choice)
+    if len(gpu_infos) > 1:
+        if choice == 0:
+            return -1  # represents all / auto
+        # map menu numbering back to gpu index order by free memory sort used later
+        # We will re-map logically outside.
+        return choice - 1  # 0-based into sorted gpu_infos
+    else:
+        if choice == 0:
+            return 0
+        return 0
+
+
 def select_device(require_cuda: bool = True) -> Tuple[str, bool]:
     if not torch.cuda.is_available():
         if require_cuda:
             raise RuntimeError("CUDA not available. Install a CUDA-enabled PyTorch build.")
         return ("cpu", False)
 
+    # Hard override takes precedence before any probing
+    force_val = os.getenv('INDEXTTS_FORCE_DEVICE')  # accepts 'auto', index, or cuda:X
     env_val = os.getenv('INDEXTTS_CUDA_DEVICE')
     dev_count = torch.cuda.device_count()
-    if env_val:
+    if force_val and force_val.strip().lower() != 'auto':
+        try:
+            fv = force_val.strip()
+            if fv.startswith('cuda:'):
+                idx = int(fv.split(':',1)[1])
+            else:
+                idx = int(fv)
+            if 0 <= idx < dev_count:
+                device = f"cuda:{idx}"
+                print(f">> Forced device selection via INDEXTTS_FORCE_DEVICE={force_val} -> {device}")
+            else:
+                print(f">> INDEXTTS_FORCE_DEVICE={force_val} out of range; ignoring")
+        except Exception:
+            print(f">> Could not parse INDEXTTS_FORCE_DEVICE='{force_val}'; ignoring")
+
+    if device is None and env_val:
         try:
             if env_val.startswith('cuda:'):
                 idx = int(env_val.split(':',1)[1])
@@ -77,6 +133,11 @@ def select_device(require_cuda: bool = True) -> Tuple[str, bool]:
     required_vram = int(os.getenv('INDEXTTS_REQUIRED_VRAM_MB', '10000'))
     allow_auto_fp16 = os.getenv('INDEXTTS_ALLOW_AUTO_FP16', '1').strip().lower() in ('1','true','yes')
     gpu_infos = _query_gpu_memory()
+    if os.getenv('INDEXTTS_DEVICE_VERBOSE', '0').strip().lower() in ('1','true','yes'):
+        if gpu_infos:
+            print(">> Detected GPUs (idx free/total MB): " + ", ".join(f"{i}:{free}/{tot}" for i, free, tot in gpu_infos))
+        else:
+            print(">> Could not query detailed GPU memory (nvidia-smi unavailable); falling back to torch properties or defaults")
 
     auto_fp16 = False
     selected_info = None  # (idx, free, total)
@@ -100,6 +161,21 @@ def select_device(require_cuda: bool = True) -> Tuple[str, bool]:
                 best = max(gpu_infos, key=lambda x: x[1])
                 print(f">> No GPU meets VRAM target ({required_vram}MB); selecting cuda:{best[0]} (free {best[1]}MB)")
                 device = f"cuda:{best[0]}"; selected_info = best
+
+            # Offer interactive override if allowed & multi-device present
+            interactive_flag = os.getenv('INDEXTTS_INTERACTIVE_SELECT', '1').strip().lower() not in ('0','false','no')
+            if interactive_flag and sys.stdin and sys.stdin.isatty() and len(gpu_infos) > 0:
+                menu_infos = sorted(gpu_infos, key=lambda x: -x[1])  # sorted by free desc
+                choice = _interactive_menu(menu_infos)
+                if choice is not None:
+                    if choice == -1:
+                        # 'All CUDA devices' – currently we do not implement multi-GPU inference; log and keep best
+                        print(">> 'All CUDA devices' selected. Multi-GPU inference not yet implemented; using best-fit device.")
+                    else:
+                        if 0 <= choice < len(menu_infos):
+                            sel = menu_infos[choice]
+                            device = f"cuda:{sel[0]}"; selected_info = sel
+                            print(f">> Overridden selection -> {device} (free {sel[1]}MB / total {sel[2]}MB)")
         else:
             # Interactive multi-device fallback
             if dev_count <= 1:

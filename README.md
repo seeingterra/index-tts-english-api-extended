@@ -211,10 +211,22 @@ CPU fallback is intentionally disabled: a CUDA‑enabled PyTorch build is requir
 | `INDEXTTS_CUDA_DEVICE` | Select GPU index | `INDEXTTS_CUDA_DEVICE=1` |
 | `INDEXTTS_CUDA_MEM_FRACTION` | Cap process VRAM usage | `INDEXTTS_CUDA_MEM_FRACTION=0.8` |
 | `INDEXTTS_PRELOAD` | Preload on startup (1 default) | `INDEXTTS_PRELOAD=1` |
+| `INDEXTTS_FORCE_DEVICE` | Hard override device (index or cuda:X) | `INDEXTTS_FORCE_DEVICE=0` |
+| `INDEXTTS_INTERACTIVE_SELECT` | Enable interactive GPU menu (TTY only) | `INDEXTTS_INTERACTIVE_SELECT=1` |
+| `INDEXTTS_DEVICE_VERBOSE` | Verbose GPU probing logs | `INDEXTTS_DEVICE_VERBOSE=1` |
+| `INDEXTTS_DEVICE_LOG` | Suppress device summary when 0 | `INDEXTTS_DEVICE_LOG=0` |
 
 ### Selecting a Device
 
-The service queries `nvidia-smi` for free memory and picks a suitable device; override manually with:
+The service queries `nvidia-smi` for free memory and picks a suitable device. On interactive TTY runs (WebUI, standalone API, scripts) an **interactive GPU selection menu** is shown by default when multiple GPUs exist (can be disabled with `INDEXTTS_INTERACTIVE_SELECT=0`).
+
+Override methods (precedence order):
+1. `INDEXTTS_FORCE_DEVICE` (explicit hard selection, accepts `auto`, integer, or `cuda:X`)
+2. `INDEXTTS_CUDA_DEVICE` (soft preference)
+3. Interactive menu (if enabled & TTY)
+4. Automatic VRAM-based selection / fp16 fallback
+
+Manual example:
 
 ```powershell
 $env:INDEXTTS_CUDA_DEVICE='0'
