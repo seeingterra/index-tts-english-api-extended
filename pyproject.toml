@@ -24,10 +24,9 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-  # IMPORTANT: Always run `uv lock` or `uv lock --upgrade` to resolve dependencies
-  # and update the lockfile after editing anything below. When using a
-  # standard Python venv on Windows, update dependencies with pip (or tools
-  # such as pip-tools) instead of the `uv` package manager.
+  # IMPORTANT: Use a standard Python virtual environment and pip to manage
+  # dependencies. Run `python -m pip install -r requirements.txt` or the
+  # repository helper scripts under `scripts/` for a Windows-friendly setup.
   "accelerate==1.8.1",
   "cn2an==0.5.22",
   "cython==3.0.7",
@@ -63,18 +62,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# To install the WebUI support, use `uv sync --extra webui` (or `--all-extras`).
+# To install the WebUI support, install the `webui` extras with pip (see README).
 webui = [
   "gradio==5.44.1",
 ]
-# To install the DeepSpeed support, use `uv sync --extra deepspeed` (or `--all-extras`).
+# To install the DeepSpeed support, install the `deepspeed` extras with pip.
 deepspeed = [
   "deepspeed==0.17.1",
 ]
 
 [project.urls]
-Homepage = "https://github.com/index-tts/index-tts"
-Repository = "https://github.com/index-tts/index-tts.git"
+Homepage = "https://github.com/seeingterra/index-tts-english-api-extended"
+Repository = "https://github.com/seeingterra/index-tts-english-api-extended.git"
 
 [project.scripts]
 # Set the installed binary names and entry points.

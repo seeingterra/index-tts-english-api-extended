@@ -2,32 +2,61 @@
 <img src='assets/index_icon.png' width="250"/>
 </div>
 
+
 <div align="center">
-<a href="docs/README_zh.md" style="font-size: 24px">简体中文</a> | 
-<a href="README.md" style="font-size: 24px">English</a>
+  <a href="docs/INDEX.md" title="Documentation Index">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Docs-Index-0A84FF?logo=readthedocs&logoColor=white" />
+      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/Docs-Index-blue?logo=readthedocs" />
+      <img src="https://img.shields.io/badge/Docs-Index-blue?logo=readthedocs" alt="Documentation Index" />
+    </picture>
+  </a>
+  <a href="docs/VOXTA_INTEGRATION.md" title="Voxta Integration Guide">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Voxta_Integration-16A34A?logo=fastapi&logoColor=white" />
+      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/Voxta_Integration-success?logo=fastapi" />
+      <img src="https://img.shields.io/badge/Voxta_Integration-success?logo=fastapi" alt="Voxta Integration" />
+    </picture>
+  </a>
+  <a href="#gpu-requirements" title="GPU Requirements (CUDA 8GB+ Recommended)">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/GPU-CUDA_8GB%2B-7E22CE?logo=nvidia&logoColor=white" />
+      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/GPU-CUDA_8GB%2B-brightgreen?logo=nvidia" />
+      <img src="https://img.shields.io/badge/GPU-CUDA_8GB%2B-brightgreen?logo=nvidia" alt="GPU: CUDA 8GB+" />
+    </picture>
+  </a>
+  <a href="#gpu-requirements" title="CPU Fallback Not Supported">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/CPU-No__Fallback-DC2626?logo=powershell&logoColor=white" />
+      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/CPU-No__Fallback-red?logo=powershell" />
+      <img src="https://img.shields.io/badge/CPU-No__Fallback-red?logo=powershell" alt="CPU: No fallback" />
+    </picture>
+  </a>
 </div>
 
-## 👉🏻 IndexTTS2 👈🏻
+> Quick links: [Docs Index](docs/INDEX.md) · [Voxta Integration](docs/VOXTA_INTEGRATION.md) · [Standalone API Quickstart](#-standalone-fastapi--voxta-compatible-api-quickstart)
+
+<div align="center">
+<a href="README.md" style="font-size: 24px">English</a>
+## IndexTTS2
 
 <center><h3>IndexTTS2: A Breakthrough in Emotionally Expressive and Duration-Controlled Auto-Regressive Zero-Shot Text-to-Speech</h3></center>
 
-[![IndexTTS2](assets/IndexTTS2_banner.png)](assets/IndexTTS2_banner.png)
+2. Clone the repository and fetch large files (Windows PowerShell):
 
-
-<div align="center">
+```powershell
+git clone https://github.com/seeingterra/index-tts-english-api-extended.git
+cd index-tts-english-api-extended
+git lfs pull
+```
   <a href='https://arxiv.org/abs/2506.21619'>
     <img src='https://img.shields.io/badge/ArXiv-2506.21619-red?logo=arxiv'/>
-  </a>
-  <br/>
-  <a href='https://github.com/index-tts/index-tts'>
-    <img src='https://img.shields.io/badge/GitHub-Code-orange?logo=github'/>
-  </a>
-  <a href='https://index-tts.github.io/index-tts2.github.io/'>
-    <img src='https://img.shields.io/badge/GitHub-Demo-orange?logo=github'/>
-  </a>
-  <br/>
-  <a href='https://huggingface.co/spaces/IndexTeam/IndexTTS-2-Demo'>
-    <img src='https://img.shields.io/badge/HuggingFace-Demo-blue?logo=huggingface'/>
+If you prefer using a mirror for faster downloads, pass the `-i` option to pip. Example:
+
+```powershell
+python -m pip install -e . -i https://mirrors.aliyun.com/pypi/simple/
+```
+<!-- mirrors omitted for brevity -->
   </a>
   <a href='https://huggingface.co/IndexTeam/IndexTTS-2'>
     <img src='https://img.shields.io/badge/HuggingFace-Model-blue?logo=huggingface' />
@@ -55,10 +84,16 @@ Furthermore, IndexTTS2 achieves disentanglement between emotional expression and
 To enhance speech clarity in highly emotional expressions, we incorporate GPT latent representations and design a novel three-stage training paradigm to improve the stability of the generated speech. Additionally, to lower the barrier for emotional control, we designed a soft instruction mechanism based on text descriptions by fine-tuning Qwen3, effectively guiding the generation of speech with the desired emotional orientation.
 
 Finally, experimental results on multiple datasets show that IndexTTS2 outperforms state-of-the-art zero-shot TTS models in terms of word error rate, speaker similarity, and emotional fidelity. Audio samples are available at: <a href="https://index-tts.github.io/index-tts2.github.io/">IndexTTS2 demo page</a>.
+Run the web UI with your Python interpreter (after activating the project venv):
 
-**Tips:** Please contact the authors for more detailed information. For commercial usage and cooperation, please contact <u>indexspeech@bilibili.com</u>.
+```powershell
+python webui.py
+```
 
 
+```powershell
+python webui.py -h
+```
 ### Feel IndexTTS2
 
 <div align="center">
@@ -74,8 +109,8 @@ Finally, experimental results on multiple datasets show that IndexTTS2 outperfor
 
 ### Contact
 
-QQ Group：553460296(No.1) 663272642(No.4)  \
-Discord：https://discord.gg/uT32E7KDmy  \
+For community support see the repository issues or discussion pages.
+
 ### ⚙️ Environment Setup (Windows 11 - recommended)
 
 1. Ensure that you have both [git](https://git-scm.com/downloads) and
@@ -87,10 +122,10 @@ The Git-LFS plugin must also be enabled for your user account:
 git lfs install
 ```
 
-2. Clone the repository and fetch large files:
+2. Clone this repository and fetch large files:
 
 ```powershell
-git clone https://github.com/index-tts/index-tts.git && cd index-tts
+git clone https://github.com/seeingterra/index-tts-english-api-extended.git && cd index-tts-english-api-extended
 git lfs pull
 ```
 
@@ -137,12 +172,58 @@ ModelScope:
 python -m pip install modelscope
 modelscope download --model IndexTeam/IndexTTS-2 --local_dir checkpoints
 ```
+
+## GPU Requirements
+
+| Tier | Approx VRAM | Mode / Notes | Suggested Settings |
+|------|-------------|-------------|--------------------|
+| Minimum | 6–8 GB | fp16, shorter texts, limited beams | `INDEXTTS_USE_FP16=1`, reduce `max_mel_tokens` (e.g. 900) |
+| Recommended | 8–12 GB | fp16, standard prompts, default beams | `INDEXTTS_USE_FP16=1` (or auto), default `max_mel_tokens=1500` |
+| High | 12–16 GB | fp16/fp32 mix, longer prompts, more beams | Adjust `INDEXTTS_REQUIRED_VRAM_MB` (e.g. 12000) |
+| Premium | 16 GB+ | Full precision experiments, concurrent requests | Optionally disable fp16 for quality tests |
+
+CPU fallback is intentionally disabled: a CUDA‑enabled PyTorch build is required.
+
+### Key Environment Variables
+
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `INDEXTTS_USE_FP16` | Force fp16 load | `INDEXTTS_USE_FP16=1` |
+| `INDEXTTS_ALLOW_AUTO_FP16` | Auto fp16 if VRAM insufficient | `INDEXTTS_ALLOW_AUTO_FP16=1` |
+| `INDEXTTS_REQUIRED_VRAM_MB` | Target free VRAM threshold | `INDEXTTS_REQUIRED_VRAM_MB=10000` |
+| `INDEXTTS_CUDA_DEVICE` | Select GPU index | `INDEXTTS_CUDA_DEVICE=1` |
+| `INDEXTTS_CUDA_MEM_FRACTION` | Cap process VRAM usage | `INDEXTTS_CUDA_MEM_FRACTION=0.8` |
+| `INDEXTTS_PRELOAD` | Preload on startup (1 default) | `INDEXTTS_PRELOAD=1` |
+
+### Selecting a Device
+
+The service queries `nvidia-smi` for free memory and picks a suitable device; override manually with:
+
+```powershell
+$env:INDEXTTS_CUDA_DEVICE='0'
+$env:INDEXTTS_USE_FP16='1'
+python -m uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011
+```
+
+### Troubleshooting GPU Issues
+
+| Symptom | Check / Fix |
+|---------|-------------|
+| `CUDA not available` | Installed CPU-only torch; reinstall CUDA wheel from pytorch.org (matching your driver). |
+| OOM during init | Enable fp16 (`INDEXTTS_USE_FP16=1`), lower `INDEXTTS_REQUIRED_VRAM_MB`, reduce `max_mel_tokens`. |
+| Fragmentation errors | Set `TORCH_CUDA_ALLOC_CONF=max_split_size_mb:64` (already defaulted) or restart process. |
+| Unexpected device picked | Set `INDEXTTS_CUDA_DEVICE` explicitly. |
+| Performance slower than expected | Ensure no other heavy processes share the GPU; verify PCIe power settings. |
+
+`nvidia-smi --query-gpu=index,name,memory.total,memory.used --format=csv,noheader` is invoked internally; you can run it manually for diagnostics.
+
 local mirrors in China (choose one mirror from the list below):
 
-```bash
-uv sync --all-extras --default-index "https://mirrors.aliyun.com/pypi/simple"
+```powershell
+# Use pip with a mirror; example installing the project in editable mode with a mirror:
+python -m pip install -e . --index-url https://mirrors.aliyun.com/pypi/simple/
 
-uv sync --all-extras --default-index "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+python -m pip install -e . --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 ```
 
 > [!TIP]
@@ -168,16 +249,16 @@ uv sync --all-extras --default-index "https://mirrors.tuna.tsinghua.edu.cn/pypi/
 
 Download via `huggingface-cli`:
 
-```bash
-uv tool install "huggingface_hub[cli]"
+```powershell
+python -m pip install huggingface_hub[cli]
 
 hf download IndexTeam/IndexTTS-2 --local-dir=checkpoints
 ```
 
 Or download via `modelscope`:
 
-```bash
-uv tool install "modelscope"
+```powershell
+python -m pip install modelscope
 
 modelscope download --model IndexTeam/IndexTTS-2 --local_dir checkpoints
 ```
@@ -210,10 +291,11 @@ These helpers are convenience wrappers for Windows users; you can also manage th
 > [!NOTE]
 > In addition to the above models, some small models will also be automatically
 > downloaded when the project is run for the first time. If your network environment
-> has slow access to HuggingFace, it is recommended to execute the following
-> command before running the code:
-> 
-> 除了以上模型外，项目初次运行时还会自动下载一些小模型，如果您的网络环境访问HuggingFace的速度较慢，推荐执行：
+> has slow access to HuggingFace, it is recommended to set the HF mirror endpoint before running the code:
+>
+> ```bash
+> export HF_ENDPOINT="https://hf-mirror.com"
+> ```
 > 
 > ```bash
 > export HF_ENDPOINT="https://hf-mirror.com"
@@ -223,10 +305,11 @@ These helpers are convenience wrappers for Windows users; you can also manage th
 #### 🖥️ Checking PyTorch GPU Acceleration
 
 If you need to diagnose your environment to see which GPUs are detected,
-you can use our included utility to check your system:
+you can use our included utility to check your system. Run it from the repo root after activating your venv:
 
-```bash
-uv run tools/gpu_check.py
+```powershell
+.\.venv\Scripts\Activate.ps1
+python tools/gpu_check.py
 ```
 
 ### Windows: PyTorch import errors (WinError 126)
@@ -266,8 +349,8 @@ For the most up-to-date install commands tailored to your OS, CUDA and Python ve
 
 #### 🌐 Web Demo
 
-```bash
-uv run webui.py
+```powershell
+python webui.py
 ```
 
 Open your browser and visit `http://127.0.0.1:7860` to see the demo.
@@ -276,8 +359,8 @@ You can also adjust the settings to enable features such as FP16 inference (lowe
 VRAM usage), DeepSpeed acceleration, compiled CUDA kernels for speed, etc. All
 available options can be seen via the following command:
 
-```bash
-uv run webui.py -h
+```powershell
+python webui.py -h
 ```
 
 Have fun!
@@ -294,16 +377,20 @@ Have fun!
 
 #### 📝 Using IndexTTS2 in Python
 
-To run scripts, you *must* use the `uv run <file.py>` command to ensure that
-the code runs inside your current "uv" environment. It *may* sometimes also be
-necessary to add the current directory to your `PYTHONPATH`, to help it find
-the IndexTTS modules.
+To run scripts, create and activate a Python virtual environment so the project's package is importable and scripts run with the venv interpreter.
 
-Example of running a script via `uv`:
+Example (PowerShell) – create and activate a venv, install the project, then run the script:
 
-```bash
-PYTHONPATH="$PYTHONPATH:." uv run indextts/infer_v2.py
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e .
+
+# Run the script (editable install makes the package importable):
+python indextts\infer_v2.py
 ```
+
+Note: older guides referenced the 'uv' environment manager. This repository uses the included Python entrypoints instead (for example `python webui.py` for the Web UI and the `fastapi_app` package for the API). Use a Python virtual environment (`venv`) and pip as shown above.
 
 Here are several examples of how to use IndexTTS2 in your own scripts:
 
@@ -321,7 +408,7 @@ tts.infer(spk_audio_prompt='examples/voice_01.wav', text=text, output_path="gen.
 ```python
 from indextts.infer_v2 import IndexTTS2
 tts = IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=False, use_cuda_kernel=False, use_deepspeed=False)
-text = "酒楼丧尽天良，开始借机竞拍房间，哎，一群蠢货。"
+text = "This is an example emotional sentence for synthesis."
 tts.infer(spk_audio_prompt='examples/voice_07.wav', text=text, output_path="gen.wav", emo_audio_prompt="examples/emo_sad.wav", verbose=True)
 ```
 
@@ -332,7 +419,7 @@ tts.infer(spk_audio_prompt='examples/voice_07.wav', text=text, output_path="gen.
 ```python
 from indextts.infer_v2 import IndexTTS2
 tts = IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=False, use_cuda_kernel=False, use_deepspeed=False)
-text = "酒楼丧尽天良，开始借机竞拍房间，哎，一群蠢货。"
+text = "This is an example emotional sentence for synthesis."
 tts.infer(spk_audio_prompt='examples/voice_07.wav', text=text, output_path="gen.wav", emo_audio_prompt="examples/emo_sad.wav", emo_alpha=0.9, verbose=True)
 ```
 
@@ -350,7 +437,7 @@ tts.infer(spk_audio_prompt='examples/voice_07.wav', text=text, output_path="gen.
 ```python
 from indextts.infer_v2 import IndexTTS2
 tts = IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=False, use_cuda_kernel=False, use_deepspeed=False)
-text = "哇塞！这个爆率也太高了！欧皇附体了！"
+text = "Wow! This example uses a surprised emotion for demonstration."
 tts.infer(spk_audio_prompt='examples/voice_10.wav', text=text, output_path="gen.wav", emo_vector=[0, 0, 0, 0, 0, 0, 0.45, 0], use_random=False, verbose=True)
 ```
 
@@ -365,7 +452,7 @@ tts.infer(spk_audio_prompt='examples/voice_10.wav', text=text, output_path="gen.
 ```python
 from indextts.infer_v2 import IndexTTS2
 tts = IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=False, use_cuda_kernel=False, use_deepspeed=False)
-text = "快躲起来！是他要来了！他要来抓我们了！"
+text = "Hide! He's coming—he's going to grab us!"
 tts.infer(spk_audio_prompt='examples/voice_12.wav', text=text, output_path="gen.wav", emo_alpha=0.6, use_emo_text=True, use_random=False, verbose=True)
 ```
 
@@ -377,8 +464,8 @@ tts.infer(spk_audio_prompt='examples/voice_12.wav', text=text, output_path="gen.
 ```python
 from indextts.infer_v2 import IndexTTS2
 tts = IndexTTS2(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=False, use_cuda_kernel=False, use_deepspeed=False)
-text = "快躲起来！是他要来了！他要来抓我们了！"
-emo_text = "你吓死我了！你是鬼吗？"
+text = "Hide! He's coming—he's going to grab us!"
+emo_text = "You scared me to death! Are you a ghost?"
 tts.infer(spk_audio_prompt='examples/voice_12.wav', text=text, output_path="gen.wav", emo_alpha=0.6, use_emo_text=True, emo_text=emo_text, use_random=False, verbose=True)
 ```
 
@@ -391,12 +478,12 @@ You can also use our previous IndexTTS1 model by importing a different module:
 from indextts.infer import IndexTTS
 tts = IndexTTS(model_dir="checkpoints",cfg_path="checkpoints/config.yaml")
 voice = "examples/voice_07.wav"
-text = "大家好，我现在正在bilibili 体验 ai 科技，说实话，来之前我绝对想不到！AI技术已经发展到这样匪夷所思的地步了！比如说，现在正在说话的其实是B站为我现场复刻的数字分身，简直就是平行宇宙的另一个我了。如果大家也想体验更多深入的AIGC功能，可以访问 bilibili studio，相信我，你们也会吃惊的。"
+text = "Hello everyone — I'm trying out the AIGC demo. The results are astonishing."
 tts.infer(voice, text, 'gen.wav')
 ```
 
 For more detailed information, see [README_INDEXTTS_1_5](archive/README_INDEXTTS_1_5.md),
-or visit the IndexTTS1 repository at <a href="https://github.com/index-tts/index-tts/tree/v1.5.0">index-tts:v1.5.0</a>.
+or visit the legacy IndexTTS v1.5 repository at <a href="https://github.com/index-tts/index-tts/tree/v1.5.0">index-tts v1.5</a>.
 
 
 ## Our Releases and Demos
@@ -446,3 +533,144 @@ IndexTTS:
   url={https://arxiv.org/abs/2502.05512}
 }
 ```
+
+## 🔌 Standalone FastAPI / Voxta-Compatible API Quickstart
+
+The repository includes a pure FastAPI implementation (no Gradio dependency) that exposes
+Voxta-style TTS endpoints using the core IndexTTS2 model. It reuses the existing example
+prompt audios under `examples/` (e.g. `voice_01.wav` … `voice_12.wav`) — no new example
+files are required or added beyond the originals.
+
+Voxta short summary: The API supports discovery (`/v1/voxta/provider`, `/v1/voxta/voices`), robust
+voice field normalization (`voice`, `parameters.voice`, `speaker`, `character`, labels like `Sam (voice_07)`),
+deterministic generation (`generation_seed`, `do_sample=false`, `temperature=0`), emotion control via
+`emo_text` / vectors, optional `spk_audio` (file / URL / data URI), and debug endpoints
+(`/v1/debug/resolve`, `/v1/debug/resolve_verbose`). For a detailed table and deep-dive see:
+[`docs/VOXTA_INTEGRATION.md`](docs/VOXTA_INTEGRATION.md).
+
+See also the consolidated documentation index: [`docs/INDEX.md`](docs/INDEX.md).
+
+### 1. Environment (one time)
+
+```powershell
+python -m venv .venv
+./.venv/Scripts/Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
+
+Ensure the checkpoint directory (`checkpoints/`) has the required model weights (see earlier sections).
+
+### 2. Start the standalone API (port 8011)
+
+```powershell
+python -m uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011 --log-level info
+```
+
+Already inside an activated venv (no extra setup needed)? Just run the server:
+
+PowerShell (Windows):
+
+```powershell
+python -m uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011
+```
+
+Unix / WSL / macOS:
+
+```bash
+uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011
+```
+
+Deterministic + fp16 example (Windows):
+
+```powershell
+$env:INDEXTTS_USE_FP16='1'
+$env:INDEXTTS_PRELOAD='1'
+python -m uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011 --log-level warning
+```
+
+Deterministic + fp16 example (bash):
+
+```bash
+INDEXTTS_USE_FP16=1 INDEXTTS_PRELOAD=1 uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011 --log-level warning
+```
+
+If you need deterministic runs or lower VRAM usage you can set (before launching):
+
+```powershell
+$env:INDEXTTS_USE_FP16='1'        # force half precision
+$env:INDEXTTS_CUDA_DEVICE='0'     # choose GPU
+$env:INDEXTTS_PRELOAD='1'         # (default) preload model at startup
+```
+
+### 3. Health check
+
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8011/health -Method Get
+```
+
+### 4. List available voices
+
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8011/v1/voxta/voices -Method Get
+```
+
+### 5. Debug voice resolution (no synthesis)
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8011/v1/debug/resolve_verbose -Body '{"parameters":{"voice":"voice_12"},"input":"Hi"}' -ContentType 'application/json'
+```
+
+### 6. Synthesize speech (returns WAV bytes)
+
+```powershell
+$body = '{"parameters":{"voice":"voice_12","generation_seed":12345,"do_sample":false,"temperature":0},"input":"Hide! He\'s coming—he\'s going to grab us!","language":"en","emo_control_method":"Use text description to control emotion","emo_text":"You scared me to death! Are you a ghost?","emo_weight":0.6,"emo_random":false}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8011/v1/audio/speech -Body $body -ContentType 'application/json' -OutFile out.wav
+```
+
+### 7. Voice cloning notes
+
+The server automatically maps any of these (case-insensitive / normalized) forms:
+
+* `voice_12`
+* `12`
+* Labels containing parentheses: `Sam (voice_12)`
+* JSON with nested objects: `{"voice":{"value":"voice_12"}}`
+
+If cloning seems wrong:
+
+1. Call `/v1/debug/resolve_verbose` with the *exact* payload your client sends.
+2. Confirm `discovered_voice_candidate` matches a filename under `examples/`.
+3. Ensure you are not enabling randomness (`do_sample=true` or high `temperature`) when expecting strict cloning.
+
+### 8. Determinism
+
+Use any of these to stabilize output:
+
+* `do_sample=false`
+* `temperature=0`
+* `generation_seed=<int>` inside `parameters`.
+
+All three factors are incorporated into the cache key to reuse identical generations.
+
+### 9. GPU tuning env vars
+
+| Variable | Purpose |
+|----------|---------|
+| `INDEXTTS_CUDA_DEVICE` | Force CUDA device (e.g. `1` or `cuda:1`). |
+| `INDEXTTS_REQUIRED_VRAM_MB` | Minimum free VRAM target for selecting a GPU (default 10000). |
+| `INDEXTTS_ALLOW_AUTO_FP16` | Allow automatic fp16 fallback if full requirement unmet. |
+| `INDEXTTS_USE_FP16` | Force fp16 regardless of auto selection. |
+| `INDEXTTS_CUDA_MEM_FRACTION` | Cap per-process GPU memory usage fraction. |
+| `INDEXTTS_PRELOAD` | Set `0` to skip model preload at startup. |
+
+### 10. Troubleshooting quick list
+
+| Symptom | Check |
+|---------|-------|
+| Port 8011 not accepting connections | Run in foreground for logs; ensure no stale python process holds the port (`netstat -aon | findstr :8011`). |
+| Empty log files in background start | Foreground run will reveal early exception (often port bind or CUDA). |
+| Wrong voice | `/v1/debug/resolve_verbose` and confirm example file exists. |
+| CUDA OOM or alloc failures | Set `INDEXTTS_USE_FP16=1` or reduce memory via `INDEXTTS_CUDA_MEM_FRACTION`. |
+
+This quickstart intentionally uses only the standard demo voice prompts already present under `examples/` and does **not** introduce any new demo assets.

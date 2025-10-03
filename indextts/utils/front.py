@@ -92,10 +92,43 @@ class TextNormalizer:
         if self.zh_normalizer is not None and self.en_normalizer is not None:
             return
         if platform.system() != "Linux":  # Mac and Windows
-            from wetext import Normalizer
+            # wetext depends on native kaldifst on some platforms. Provide a
+            # minimal fallback normalizer so Windows users without kaldifst
+            # can still run an English-only flow.
+            try:
+                from wetext import Normalizer
 
-            self.zh_normalizer = Normalizer(remove_erhua=False, lang="zh", operator="tn")
-            self.en_normalizer = Normalizer(lang="en", operator="tn")
+                self.zh_normalizer = Normalizer(remove_erhua=False, lang="zh", operator="tn")
+                self.en_normalizer = Normalizer(lang="en", operator="tn")
+            except Exception:
+                # Fallback SimpleNormalizer uses basic cleanup and the
+                # existing character replacement maps. It's intentionally
+                # lightweight (English-first) so it doesn't pull heavy
+                # native deps like kaldifst.
+                en_map = self.char_rep_map
+                zh_map = self.zh_char_rep_map
+
+                class SimpleNormalizer:
+                    def __init__(self, lang: str = "en"):
+                        self.lang = lang
+
+                    def normalize(self, text: str) -> str:
+                        # Basic normalization: collapse whitespace and apply
+                        # character replacements appropriate for the language.
+                        t = re.sub(r"\s+", " ", text).strip()
+                        try:
+                            if self.lang == "zh":
+                                pattern = re.compile("|".join(re.escape(p) for p in zh_map.keys()))
+                                return pattern.sub(lambda x: zh_map[x.group()], t)
+                            # default: English-light normalization
+                            pattern = re.compile("|".join(re.escape(p) for p in en_map.keys()))
+                            return pattern.sub(lambda x: en_map[x.group()], t)
+                        except Exception:
+                            return t
+
+                # Instantiate fallback normalizers
+                self.zh_normalizer = SimpleNormalizer(lang="zh")
+                self.en_normalizer = SimpleNormalizer(lang="en")
         else:
             from tn.chinese.normalizer import Normalizer as NormalizerZh
             from tn.english.normalizer import Normalizer as NormalizerEn

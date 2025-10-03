@@ -68,11 +68,8 @@
 
 ### 联系方式
 
-QQ群：553460296(1群) 663272642(4群)  \
-Discord：https://discord.gg/uT32E7KDmy  \
+For community support, please use the repository issues or discussion pages.  
 邮箱：indexspeech@bilibili.com  \
-欢迎加入我们的社区！🌏  \
-欢迎大家交流讨论！
 
 ## 📣 更新日志
 
@@ -118,10 +115,10 @@ IndexTTS2架构总览：
 git lfs install
 ```
 
-2. 克隆仓库并下载大文件：
+2. 克隆本仓库并下载大文件：
 
 ```powershell
-git clone https://github.com/index-tts/index-tts.git && cd index-tts
+git clone https://github.com/seeingterra/index-tts-english-api-extended.git && cd index-tts-english-api-extended
 git lfs pull
 ```
 
@@ -175,36 +172,34 @@ modelscope download --model IndexTeam/IndexTTS-2 --local_dir checkpoints
 
 可运行脚本检测机器是否有GPU，以及是否安装了GPU版本的PyTorch。（如PyTorch版本不对，可能使用CPU启动，推理会非常慢）
 
-```bash
-uv run tools/gpu_check.py
+```powershell
+python tools/gpu_check.py
 ```
 
 ### 🔥 IndexTTS2快速体验
 
 #### 🌐 Web演示
 
-```bash
-uv run webui.py
+```powershell
+python webui.py
 ```
 
 浏览器访问 `http://127.0.0.1:7860` 查看演示。
 
-可通过命令行参数开启FP16推理（降低显存占用）、DeepSpeed加速、CUDA内核编译加速等。可运行以下命令查看所有选项：
+可通过命令行参数开启FP16推理（降低显存占用）、DeepSpeed加速、CUDA内核编译加速等。查看所有选项：
 
-```bash
-uv run webui.py -h
+```powershell
+python webui.py -h
 ```
 
 祝使用愉快！
 
 #### 📝 Python脚本调用
 
-用`uv run <file.py>`保证程序在uv创建的虚拟环境下运行。部分情况需要指定`PYTHONPATH`。
+使用 Python 虚拟环境（`venv`）并运行脚本。例如：
 
-示例：
-
-```bash
-PYTHONPATH="$PYTHONPATH:." uv run indextts/infer_v2.py
+```powershell
+PYTHONPATH="$PYTHONPATH:." python indextts/infer_v2.py
 ```
 
 以下为IndexTTS2脚本调用示例：

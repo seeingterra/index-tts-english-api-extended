@@ -1,0 +1,41 @@
+name: CI - Windows setup (CPU PyTorch)
+
+on:
+  push:
+    branches: [ add/vc-check-setup-venv ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  setup-venv-cpu:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Run setup script (InstallCpuTorch)
+        shell: pwsh
+        run: |
+          # Ensure script is executable and run with -InstallCpuTorch
+          Write-Host "Running setup_venv_py311.ps1 with -InstallCpuTorch"
+          .\scripts\setup_venv_py311.ps1 -PythonCmd 'python' -InstallCpuTorch
+
+      - name: Verify torch import (venv)
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\Activate.ps1
+          python -c "import importlib,sys; names=['torch','torchaudio','numpy'];
+          
+          for n in names:
+              try:
+                  m=importlib.import_module(n)
+                  print(n+'='+getattr(m,'__version__','unknown'))
+              except Exception as e:
+                  print('IMPORT-ERROR', n, e)
+                  sys.exit(2)
+          print('SMOKE_OK')"

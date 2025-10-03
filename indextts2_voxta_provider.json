@@ -1,0 +1,16 @@
+{
+  "label": "VibeVoice2",
+  "values": {
+    "ContentType": "audio/mpeg",
+    "ForceConversion": "true",
+    "UrlTemplate": "http://localhost:8000/v1/audio/speech",
+    "Request ContentType": "application/json",
+    "RequestBody": "{\n  \"text\": \"{{text}}\",\n  \"voice\": \"{{voice}}\",\n  \"format\": \"mp3\",\n  \"cfg_scale\": 1.5\n}",
+    "VoicesFormat": "{\n  \"label\": \"{{label}}\",\n  \"parameters\": {\n    \"voice\": \"{{id}}\"\n  }\n}",
+    "ThinkingSpeech": "uh, ...\nmmh...\nhum...\nhuh...\noh...",
+    "AudioGap": "0",
+    "VoicesUrl": "http://localhost:8000/v1/voices",
+    "AuthorizationHeader": " ",
+    "": ""
+  }
+}

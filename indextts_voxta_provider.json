@@ -1,0 +1,19 @@
+{
+  "label": "IndexTTS (local)",
+  "values": {
+    "ContentType": "audio/wav",
+    "ForceConversion": "false",
+  "UrlTemplate": "http://localhost:8011/v1/audio/speech",
+    "Request ContentType": "application/json",
+  "RequestBody": "{\n  \"model\": \"{{voice}}\",\n  \"voice\": \"{{voice}}\",\n  \"parameters\": { \"voice\": \"{{voice}}\" },\n  \"input\": \"{{text}}\",\n  \"language\": \"{{language}}\",\n  \"emotion\": \"{{emotion}}\",\n  \"emo_control_method\": \"Same as the voice reference\",\n  \"format\": \"wav\"\n}",
+  "VoicesFormat": "{\n  \"label\": \"{{label}}\",\n  \"voice\": \"{{voice}}\",\n  \"parameters\": {\n    \"voice\": \"{{voice}}\"\n  }\n}",
+  "ProviderNotes": "Ensure the local API runs on port 8011. CUDA-enabled PyTorch required (no CPU fallback). See docs/INDEX.md for full documentation. Use /v1/debug/resolve_verbose for voice mapping diagnostics.",
+  "DocsIndex": "http://localhost:8011/ (serve locally) | Refer to repository docs/INDEX.md",
+  "GPURequirements": "CUDA 8GB+ recommended (fp16). Set INDEXTTS_USE_FP16=1 for lower VRAM; no CPU fallback.",
+  "DebugEndpoints": "/v1/debug/resolve, /v1/debug/resolve_verbose",
+    "ThinkingSpeech": "..",
+    "AudioGap": "0",
+    "VoicesUrl": "http://localhost:8011/v1/voxta/voices",
+    "AuthorizationHeader": ""
+  }
+}

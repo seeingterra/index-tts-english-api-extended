@@ -603,7 +603,7 @@ class IndexTTS2:
             print(">> wav file saved to:", output_path)
             return output_path
         else:
-            # 返回以符合Gradio的格式要求
+            # Return in a format compatible with Gradio
             wav_data = wav.type(torch.int16)
             wav_data = wav_data.numpy().T
             return (sampling_rate, wav_data)
