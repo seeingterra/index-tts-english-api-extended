@@ -23,4 +23,6 @@ if (Test-Path (Join-Path $PWD "requirements.txt")) {
 # Use UVICORN_PORT env var if present, otherwise default to 8010 to match in-code defaults
 $port = $env:UVICORN_PORT; if (-not $port) { $port = 8010 }
 Write-Host "Starting FastAPI app (using venv at $venvPath) on port $port..."
-python -m uvicorn fastapi_app.main:app --host 0.0.0.0 --port $port
+ # Force Python to use UTF-8 stdio on Windows so model prints won't raise encoding errors
+ $env:PYTHONUTF8 = '1'
+ python -m uvicorn fastapi_app.main:app --host 0.0.0.0 --port $port

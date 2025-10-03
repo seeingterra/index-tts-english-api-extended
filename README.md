@@ -2,6 +2,40 @@
 <img src='assets/index_icon.png' width="250"/>
 </div>
 
+
+<div align="center">
+  <a href="docs/INDEX.md" title="Documentation Index">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Docs-Index-0A84FF?logo=readthedocs&logoColor=white" />
+      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/Docs-Index-blue?logo=readthedocs" />
+      <img src="https://img.shields.io/badge/Docs-Index-blue?logo=readthedocs" alt="Documentation Index" />
+    </picture>
+  </a>
+  <a href="docs/VOXTA_INTEGRATION.md" title="Voxta Integration Guide">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Voxta_Integration-16A34A?logo=fastapi&logoColor=white" />
+      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/Voxta_Integration-success?logo=fastapi" />
+      <img src="https://img.shields.io/badge/Voxta_Integration-success?logo=fastapi" alt="Voxta Integration" />
+    </picture>
+  </a>
+  <a href="#gpu-requirements" title="GPU Requirements (CUDA 8GB+ Recommended)">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/GPU-CUDA_8GB%2B-7E22CE?logo=nvidia&logoColor=white" />
+      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/GPU-CUDA_8GB%2B-brightgreen?logo=nvidia" />
+      <img src="https://img.shields.io/badge/GPU-CUDA_8GB%2B-brightgreen?logo=nvidia" alt="GPU: CUDA 8GB+" />
+    </picture>
+  </a>
+  <a href="#gpu-requirements" title="CPU Fallback Not Supported">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/CPU-No__Fallback-DC2626?logo=powershell&logoColor=white" />
+      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/CPU-No__Fallback-red?logo=powershell" />
+      <img src="https://img.shields.io/badge/CPU-No__Fallback-red?logo=powershell" alt="CPU: No fallback" />
+    </picture>
+  </a>
+</div>
+
+> Quick links: [Docs Index](docs/INDEX.md) · [Voxta Integration](docs/VOXTA_INTEGRATION.md) · [Standalone API Quickstart](#-standalone-fastapi--voxta-compatible-api-quickstart)
+
 <div align="center">
 <a href="README.md" style="font-size: 24px">English</a>
 ## IndexTTS2
@@ -138,6 +172,51 @@ ModelScope:
 python -m pip install modelscope
 modelscope download --model IndexTeam/IndexTTS-2 --local_dir checkpoints
 ```
+
+## GPU Requirements
+
+| Tier | Approx VRAM | Mode / Notes | Suggested Settings |
+|------|-------------|-------------|--------------------|
+| Minimum | 6–8 GB | fp16, shorter texts, limited beams | `INDEXTTS_USE_FP16=1`, reduce `max_mel_tokens` (e.g. 900) |
+| Recommended | 8–12 GB | fp16, standard prompts, default beams | `INDEXTTS_USE_FP16=1` (or auto), default `max_mel_tokens=1500` |
+| High | 12–16 GB | fp16/fp32 mix, longer prompts, more beams | Adjust `INDEXTTS_REQUIRED_VRAM_MB` (e.g. 12000) |
+| Premium | 16 GB+ | Full precision experiments, concurrent requests | Optionally disable fp16 for quality tests |
+
+CPU fallback is intentionally disabled: a CUDA‑enabled PyTorch build is required.
+
+### Key Environment Variables
+
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `INDEXTTS_USE_FP16` | Force fp16 load | `INDEXTTS_USE_FP16=1` |
+| `INDEXTTS_ALLOW_AUTO_FP16` | Auto fp16 if VRAM insufficient | `INDEXTTS_ALLOW_AUTO_FP16=1` |
+| `INDEXTTS_REQUIRED_VRAM_MB` | Target free VRAM threshold | `INDEXTTS_REQUIRED_VRAM_MB=10000` |
+| `INDEXTTS_CUDA_DEVICE` | Select GPU index | `INDEXTTS_CUDA_DEVICE=1` |
+| `INDEXTTS_CUDA_MEM_FRACTION` | Cap process VRAM usage | `INDEXTTS_CUDA_MEM_FRACTION=0.8` |
+| `INDEXTTS_PRELOAD` | Preload on startup (1 default) | `INDEXTTS_PRELOAD=1` |
+
+### Selecting a Device
+
+The service queries `nvidia-smi` for free memory and picks a suitable device; override manually with:
+
+```powershell
+$env:INDEXTTS_CUDA_DEVICE='0'
+$env:INDEXTTS_USE_FP16='1'
+python -m uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011
+```
+
+### Troubleshooting GPU Issues
+
+| Symptom | Check / Fix |
+|---------|-------------|
+| `CUDA not available` | Installed CPU-only torch; reinstall CUDA wheel from pytorch.org (matching your driver). |
+| OOM during init | Enable fp16 (`INDEXTTS_USE_FP16=1`), lower `INDEXTTS_REQUIRED_VRAM_MB`, reduce `max_mel_tokens`. |
+| Fragmentation errors | Set `TORCH_CUDA_ALLOC_CONF=max_split_size_mb:64` (already defaulted) or restart process. |
+| Unexpected device picked | Set `INDEXTTS_CUDA_DEVICE` explicitly. |
+| Performance slower than expected | Ensure no other heavy processes share the GPU; verify PCIe power settings. |
+
+`nvidia-smi --query-gpu=index,name,memory.total,memory.used --format=csv,noheader` is invoked internally; you can run it manually for diagnostics.
+
 local mirrors in China (choose one mirror from the list below):
 
 ```powershell
@@ -454,3 +533,144 @@ IndexTTS:
   url={https://arxiv.org/abs/2502.05512}
 }
 ```
+
+## 🔌 Standalone FastAPI / Voxta-Compatible API Quickstart
+
+The repository includes a pure FastAPI implementation (no Gradio dependency) that exposes
+Voxta-style TTS endpoints using the core IndexTTS2 model. It reuses the existing example
+prompt audios under `examples/` (e.g. `voice_01.wav` … `voice_12.wav`) — no new example
+files are required or added beyond the originals.
+
+Voxta short summary: The API supports discovery (`/v1/voxta/provider`, `/v1/voxta/voices`), robust
+voice field normalization (`voice`, `parameters.voice`, `speaker`, `character`, labels like `Sam (voice_07)`),
+deterministic generation (`generation_seed`, `do_sample=false`, `temperature=0`), emotion control via
+`emo_text` / vectors, optional `spk_audio` (file / URL / data URI), and debug endpoints
+(`/v1/debug/resolve`, `/v1/debug/resolve_verbose`). For a detailed table and deep-dive see:
+[`docs/VOXTA_INTEGRATION.md`](docs/VOXTA_INTEGRATION.md).
+
+See also the consolidated documentation index: [`docs/INDEX.md`](docs/INDEX.md).
+
+### 1. Environment (one time)
+
+```powershell
+python -m venv .venv
+./.venv/Scripts/Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
+
+Ensure the checkpoint directory (`checkpoints/`) has the required model weights (see earlier sections).
+
+### 2. Start the standalone API (port 8011)
+
+```powershell
+python -m uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011 --log-level info
+```
+
+Already inside an activated venv (no extra setup needed)? Just run the server:
+
+PowerShell (Windows):
+
+```powershell
+python -m uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011
+```
+
+Unix / WSL / macOS:
+
+```bash
+uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011
+```
+
+Deterministic + fp16 example (Windows):
+
+```powershell
+$env:INDEXTTS_USE_FP16='1'
+$env:INDEXTTS_PRELOAD='1'
+python -m uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011 --log-level warning
+```
+
+Deterministic + fp16 example (bash):
+
+```bash
+INDEXTTS_USE_FP16=1 INDEXTTS_PRELOAD=1 uvicorn fastapi_app.standalone_api:app --host 127.0.0.1 --port 8011 --log-level warning
+```
+
+If you need deterministic runs or lower VRAM usage you can set (before launching):
+
+```powershell
+$env:INDEXTTS_USE_FP16='1'        # force half precision
+$env:INDEXTTS_CUDA_DEVICE='0'     # choose GPU
+$env:INDEXTTS_PRELOAD='1'         # (default) preload model at startup
+```
+
+### 3. Health check
+
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8011/health -Method Get
+```
+
+### 4. List available voices
+
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8011/v1/voxta/voices -Method Get
+```
+
+### 5. Debug voice resolution (no synthesis)
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8011/v1/debug/resolve_verbose -Body '{"parameters":{"voice":"voice_12"},"input":"Hi"}' -ContentType 'application/json'
+```
+
+### 6. Synthesize speech (returns WAV bytes)
+
+```powershell
+$body = '{"parameters":{"voice":"voice_12","generation_seed":12345,"do_sample":false,"temperature":0},"input":"Hide! He\'s coming—he\'s going to grab us!","language":"en","emo_control_method":"Use text description to control emotion","emo_text":"You scared me to death! Are you a ghost?","emo_weight":0.6,"emo_random":false}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8011/v1/audio/speech -Body $body -ContentType 'application/json' -OutFile out.wav
+```
+
+### 7. Voice cloning notes
+
+The server automatically maps any of these (case-insensitive / normalized) forms:
+
+* `voice_12`
+* `12`
+* Labels containing parentheses: `Sam (voice_12)`
+* JSON with nested objects: `{"voice":{"value":"voice_12"}}`
+
+If cloning seems wrong:
+
+1. Call `/v1/debug/resolve_verbose` with the *exact* payload your client sends.
+2. Confirm `discovered_voice_candidate` matches a filename under `examples/`.
+3. Ensure you are not enabling randomness (`do_sample=true` or high `temperature`) when expecting strict cloning.
+
+### 8. Determinism
+
+Use any of these to stabilize output:
+
+* `do_sample=false`
+* `temperature=0`
+* `generation_seed=<int>` inside `parameters`.
+
+All three factors are incorporated into the cache key to reuse identical generations.
+
+### 9. GPU tuning env vars
+
+| Variable | Purpose |
+|----------|---------|
+| `INDEXTTS_CUDA_DEVICE` | Force CUDA device (e.g. `1` or `cuda:1`). |
+| `INDEXTTS_REQUIRED_VRAM_MB` | Minimum free VRAM target for selecting a GPU (default 10000). |
+| `INDEXTTS_ALLOW_AUTO_FP16` | Allow automatic fp16 fallback if full requirement unmet. |
+| `INDEXTTS_USE_FP16` | Force fp16 regardless of auto selection. |
+| `INDEXTTS_CUDA_MEM_FRACTION` | Cap per-process GPU memory usage fraction. |
+| `INDEXTTS_PRELOAD` | Set `0` to skip model preload at startup. |
+
+### 10. Troubleshooting quick list
+
+| Symptom | Check |
+|---------|-------|
+| Port 8011 not accepting connections | Run in foreground for logs; ensure no stale python process holds the port (`netstat -aon | findstr :8011`). |
+| Empty log files in background start | Foreground run will reveal early exception (often port bind or CUDA). |
+| Wrong voice | `/v1/debug/resolve_verbose` and confirm example file exists. |
+| CUDA OOM or alloc failures | Set `INDEXTTS_USE_FP16=1` or reduce memory via `INDEXTTS_CUDA_MEM_FRACTION`. |
+
+This quickstart intentionally uses only the standard demo voice prompts already present under `examples/` and does **not** introduce any new demo assets.

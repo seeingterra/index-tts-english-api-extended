@@ -21,4 +21,6 @@ if (Test-Path (Join-Path $PWD "requirements.txt")) {
 }
 
 Write-Host "Starting Web UI (using venv at $venvPath)..."
+# Force Python to use UTF-8 stdio on Windows so model prints won't raise encoding errors
+$env:PYTHONUTF8 = '1'
 python (Join-Path $PWD "webui.py") --port 7860 --host 127.0.0.1
